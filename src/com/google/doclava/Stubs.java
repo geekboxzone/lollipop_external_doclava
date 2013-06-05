@@ -220,12 +220,12 @@ public class Stubs {
       if (supr.isHidden()) {
         // cl is a public class declared as extending a hidden superclass.
         // this is not a desired practice but it's happened, so we deal
-        // with it by stripping off the superclass relation for purposes of
+        // with it by finding the first super class which passes checklevel for purposes of
         // generating the doc & stub information, and proceeding normally.
         cl.init(cl.asTypeInfo(), cl.realInterfaces(), cl.realInterfaceTypes(), cl.innerClasses(),
             cl.allConstructors(), cl.allSelfMethods(), cl.annotationElements(), cl.allSelfFields(),
-            cl.enumConstants(), cl.containingPackage(), cl.containingClass(), null, null, cl
-                .annotations());
+            cl.enumConstants(), cl.containingPackage(), cl.containingClass(),
+            supr.superclass(), null, cl.annotations());
         Errors.error(Errors.HIDDEN_SUPERCLASS, cl.position(), "Public class " + cl.qualifiedName()
             + " stripped of unavailable superclass " + supr.qualifiedName());
       } else {
