@@ -225,7 +225,7 @@ public class Stubs {
         cl.init(cl.asTypeInfo(), cl.realInterfaces(), cl.realInterfaceTypes(), cl.innerClasses(),
             cl.allConstructors(), cl.allSelfMethods(), cl.annotationElements(), cl.allSelfFields(),
             cl.enumConstants(), cl.containingPackage(), cl.containingClass(),
-            supr.superclass(), null, cl.annotations());
+            supr.superclass(), supr.superclassType(), cl.annotations());
         Errors.error(Errors.HIDDEN_SUPERCLASS, cl.position(), "Public class " + cl.qualifiedName()
             + " stripped of unavailable superclass " + supr.qualifiedName());
       } else {
