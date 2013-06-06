@@ -103,6 +103,13 @@ public class ApiCheckTest extends TestCase {
     assertEquals(Errors.CHANGED_SUPERCLASS, report.errors().iterator().next().error());
   }
   
+  public void testInsertedSuper() {
+    String[] args = { "test/api/inserted-super-1.xml", "test/api/inserted-super-2.xml" };
+    ApiCheck apiCheck = new ApiCheck();
+    Report report = apiCheck.checkApi(args);
+    assertEquals(0, report.errors().size());
+  }
+
   public void testAddedInterface() {
     String[] args = { "test/api/removed-interface.xml", "test/api/medium.xml" };
     ApiCheck apiCheck = new ApiCheck();
