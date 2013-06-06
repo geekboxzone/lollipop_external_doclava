@@ -33,3 +33,7 @@ LOCAL_MODULE := doclava
 LOCAL_JAVA_RESOURCE_DIRS := res
 
 include $(BUILD_HOST_JAVA_LIBRARY)
+
+# TODO: add a test target.
+# For now, you can run the unit tests thus:
+# vogar --classpath /usr/lib/jvm/java-6-sun/lib/tools.jar --classpath ../../out/host/common/obj/JAVA_LIBRARIES/antlr_intermediates/javalib.jar --sourcepath src/ --sourcepath ../jsilver/src/ --mode jvm test/doclava/ApiCheckTest.java
