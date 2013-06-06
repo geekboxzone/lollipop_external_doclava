@@ -282,8 +282,7 @@ public class ApiCheckTest extends TestCase {
     String[] args = { "test/api/constants.xml", "test/api/changed-synchronized.xml" };
     ApiCheck apiCheck = new ApiCheck();
     Report report = apiCheck.checkApi(args);
-    assertEquals(1, report.errors().size());
-    assertEquals(Errors.CHANGED_SYNCHRONIZED, report.errors().iterator().next().error());
+    assertEquals(0, report.errors().size());
   }
 
   public void testChangedVolatile() {
