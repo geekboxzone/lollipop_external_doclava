@@ -1506,6 +1506,19 @@ public class ClassInfo extends DocInfo implements ContainerInfo, Comparable, Sco
     return false;
   }
 
+  /**
+   * Returns true if {@code cl} extends the class {@code ext}.
+   */
+  private boolean extendsClass(ClassInfo cl, String ext) {
+    if (cl.qualifiedName().equals(ext)) {
+      return true;
+    }
+    if (cl.mSuperclass != null && extendsClass(cl.mSuperclass, ext)) {
+      return true;
+    }
+    return false;
+  }
+
   public void addInterface(ClassInfo iface) {
     mRealInterfaces.add(iface);
   }
@@ -1737,16 +1750,12 @@ public class ClassInfo extends DocInfo implements ContainerInfo, Comparable, Sco
           + " has changed deprecation state");
     }
 
-    if (superclassName() != null) {
-      if (cl.superclassName() == null || !superclassName().equals(cl.superclassName())) {
+    if (superclassName() != null) { // java.lang.Object can't have a superclass.
+      if (!extendsClass(cl, superclassName())) {
         consistent = false;
         Errors.error(Errors.CHANGED_SUPERCLASS, cl.position(), "Class " + qualifiedName()
             + " superclass changed from " + superclassName() + " to " + cl.superclassName());
       }
-    } else if (cl.superclassName() != null) {
-      consistent = false;
-      Errors.error(Errors.CHANGED_SUPERCLASS, cl.position(), "Class " + qualifiedName()
-          + " superclass changed from " + "null to " + cl.superclassName());
     }
 
     return consistent;
