@@ -16,6 +16,7 @@
 
 package com.google.doclava;
 
+import com.google.doclava.apicheck.ApiInfo;
 import com.google.clearsilver.jsilver.data.Data;
 
 import com.sun.javadoc.*;
@@ -175,6 +176,14 @@ public class PackageInfo extends DocInfo implements ContainerInfo {
     return mErrors;
   }
 
+  public ApiInfo containingApi() {
+    return mContainingApi;
+  }
+
+  public void setContainingApi(ApiInfo api) {
+    mContainingApi = api;
+  }
+
   // in hashed containers, treat the name as the key
   @Override
   public int hashCode() {
@@ -183,6 +192,7 @@ public class PackageInfo extends DocInfo implements ContainerInfo {
 
   private String mName;
   private PackageDoc mPackage;
+  private ApiInfo mContainingApi;
   private ClassInfo[] mInterfaces;
   private ClassInfo[] mOrdinaryClasses;
   private ClassInfo[] mEnums;
@@ -225,6 +235,7 @@ public class PackageInfo extends DocInfo implements ContainerInfo {
   }
 
   public void addInterface(ClassInfo cls) {
+      cls.setPackage(this);
       mInterfacesMap.put(cls.name(), cls);
   }
 
@@ -237,6 +248,7 @@ public class PackageInfo extends DocInfo implements ContainerInfo {
   }
 
   public void addOrdinaryClass(ClassInfo cls) {
+      cls.setPackage(this);
       mOrdinaryClassesMap.put(cls.name(), cls);
   }
 
@@ -245,6 +257,7 @@ public class PackageInfo extends DocInfo implements ContainerInfo {
   }
 
   public void addEnum(ClassInfo cls) {
+      cls.setPackage(this);
       this.mEnumsMap.put(cls.name(), cls);
   }
 
@@ -259,8 +272,9 @@ public class PackageInfo extends DocInfo implements ContainerInfo {
   // TODO: Leftovers from ApiCheck that should be better merged.
   private HashMap<String, ClassInfo> mClasses = new HashMap<String, ClassInfo>();
 
-  public void addClass(ClassInfo cl) {
-    mClasses.put(cl.name(), cl);
+  public void addClass(ClassInfo cls) {
+    cls.setPackage(this);
+    mClasses.put(cls.name(), cls);
   }
 
   public HashMap<String, ClassInfo> allClasses() {

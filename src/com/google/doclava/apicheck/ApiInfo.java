@@ -92,6 +92,7 @@ public class ApiInfo {
 
   protected void addPackage(PackageInfo pInfo) {
     // track the set of organized packages in the API
+    pInfo.setContainingApi(this);
     mPackages.put(pInfo.name(), pInfo);
 
     // accumulate a direct map of all the classes in the API
