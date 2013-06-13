@@ -18,6 +18,7 @@ package com.google.doclava;
 
 import com.google.clearsilver.jsilver.data.Data;
 import com.google.doclava.apicheck.AbstractMethodInfo;
+import com.google.doclava.apicheck.ApiInfo;
 
 import java.util.*;
 
@@ -719,13 +720,25 @@ public class MethodInfo extends MemberInfo implements AbstractMethodInfo, Resolv
     }
     return false;
   }
-  
+
   public boolean isConsistent(MethodInfo mInfo) {
     boolean consistent = true;
     if (this.mReturnType != mInfo.mReturnType && !this.mReturnType.equals(mInfo.mReturnType)) {
-      consistent = false;
-      Errors.error(Errors.CHANGED_TYPE, mInfo.position(), "Method " + mInfo.qualifiedName()
-          + " has changed return type from " + mReturnType + " to " + mInfo.mReturnType);
+      if (!mReturnType.isPrimitive() && !mInfo.mReturnType.isPrimitive()) {
+        // Check to see if our class extends the old class.
+        ApiInfo infoApi = mInfo.containingClass().containingPackage().containingApi();
+        ClassInfo infoReturnClass = infoApi.findClass(mInfo.mReturnType.qualifiedTypeName());
+        // Find the classes.
+        consistent = infoReturnClass != null &&
+                     infoReturnClass.isAssignableTo(mReturnType.qualifiedTypeName());
+      } else {
+        consistent = false;
+      }
+
+      if (!consistent) {
+        Errors.error(Errors.CHANGED_TYPE, mInfo.position(), "Method " + mInfo.qualifiedName()
+            + " has changed return type from " + mReturnType + " to " + mInfo.mReturnType);
+      }
     }
 
     if (mIsAbstract != mInfo.mIsAbstract) {

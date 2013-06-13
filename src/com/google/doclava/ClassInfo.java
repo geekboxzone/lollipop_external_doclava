@@ -557,7 +557,15 @@ public class ClassInfo extends DocInfo implements ContainerInfo, Comparable, Sco
   }
 
   public void addAnnotationElement(MethodInfo method) {
-      mAnnotationElements.add(method);
+    mAnnotationElements.add(method);
+  }
+
+  // Called by PackageInfo when a ClassInfo is added to a package.
+  // This is needed because ApiCheck uses PackageInfo.addClass
+  // rather than using setContainingPackage to dispatch to the
+  // appropriate method. TODO: move ApiCheck away from addClass.
+  void setPackage(PackageInfo pkg) {
+    mContainingPackage = pkg;
   }
 
   public void setContainingPackage(PackageInfo pkg) {
@@ -1491,32 +1499,39 @@ public class ClassInfo extends DocInfo implements ContainerInfo, Comparable, Sco
    * Returns true if {@code cl} implements the interface {@code iface} either by either being that
    * interface, implementing that interface or extending a type that implements the interface.
    */
-  private boolean implementsInterface(ClassInfo cl, String iface) {
-    if (cl.qualifiedName().equals(iface)) {
+  public boolean implementsInterface(String iface) {
+    if (qualifiedName().equals(iface)) {
       return true;
     }
-    for (ClassInfo clImplements : cl.interfaces()) {
-      if (implementsInterface(clImplements, iface)) {
+    for (ClassInfo clImplements : interfaces()) {
+      if (clImplements.implementsInterface(iface)) {
         return true;
       }
     }
-    if (cl.mSuperclass != null && implementsInterface(cl.mSuperclass, iface)) {
+    if (mSuperclass != null && mSuperclass.implementsInterface(iface)) {
       return true;
     }
     return false;
   }
 
   /**
-   * Returns true if {@code cl} extends the class {@code ext}.
+   * Returns true if {@code this} extends the class {@code ext}.
    */
-  private boolean extendsClass(ClassInfo cl, String ext) {
-    if (cl.qualifiedName().equals(ext)) {
+  public boolean extendsClass(String cl) {
+    if (qualifiedName().equals(cl)) {
       return true;
     }
-    if (cl.mSuperclass != null && extendsClass(cl.mSuperclass, ext)) {
+    if (mSuperclass != null && mSuperclass.extendsClass(cl)) {
       return true;
     }
     return false;
+  }
+
+  /**
+   * Returns true if {@code this} is assignable to cl
+   */
+  public boolean isAssignableTo(String cl) {
+    return implementsInterface(cl) || extendsClass(cl);
   }
 
   public void addInterface(ClassInfo iface) {
@@ -1599,13 +1614,13 @@ public class ClassInfo extends DocInfo implements ContainerInfo, Comparable, Sco
       consistent = false;
     }
     for (ClassInfo iface : mRealInterfaces) {
-      if (!implementsInterface(cl, iface.mQualifiedName)) {
+      if (!cl.implementsInterface(iface.mQualifiedName)) {
         Errors.error(Errors.REMOVED_INTERFACE, cl.position(), "Class " + qualifiedName()
             + " no longer implements " + iface);
       }
     }
     for (ClassInfo iface : cl.mRealInterfaces) {
-      if (!implementsInterface(this, iface.mQualifiedName)) {
+      if (!implementsInterface(iface.mQualifiedName)) {
         Errors.error(Errors.ADDED_INTERFACE, cl.position(), "Added interface " + iface
             + " to class " + qualifiedName());
         consistent = false;
@@ -1751,7 +1766,7 @@ public class ClassInfo extends DocInfo implements ContainerInfo, Comparable, Sco
     }
 
     if (superclassName() != null) { // java.lang.Object can't have a superclass.
-      if (!extendsClass(cl, superclassName())) {
+      if (!cl.extendsClass(superclassName())) {
         consistent = false;
         Errors.error(Errors.CHANGED_SUPERCLASS, cl.position(), "Class " + qualifiedName()
             + " superclass changed from " + superclassName() + " to " + cl.superclassName());
