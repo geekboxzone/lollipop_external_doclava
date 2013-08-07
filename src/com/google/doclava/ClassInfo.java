@@ -467,6 +467,12 @@ public class ClassInfo extends DocInfo implements ContainerInfo, Comparable, Sco
         }
       }
 
+      for (FieldInfo enumConst : mEnumConstants) {
+        if (!enumConst.isHidden()) {
+            all.put(enumConst.name(), enumConst);
+        }
+      }
+
       mFields = new ArrayList<FieldInfo>(all.values());
     }
     return mFields;
@@ -1542,6 +1548,10 @@ public class ClassInfo extends DocInfo implements ContainerInfo, Comparable, Sco
 
   public Map<String, FieldInfo> allFields() {
     return mApiCheckFields;
+  }
+
+  public Map<String, FieldInfo> allEnums() {
+    return mApiCheckEnumConstants;
   }
 
   /**
