@@ -178,7 +178,8 @@ public class SinceTagger {
    */
   private void versionFields(String versionName, ClassInfo spec, ClassInfo doc) {
     for (FieldInfo field : doc.fields()) {
-      if (field.getSince() == null && spec.allFields().containsKey(field.name())) {
+      if (field.getSince() == null && (spec.allFields().containsKey(field.name()) ||
+                                       spec.allEnums().containsKey(field.name()))) {
         field.setSince(versionName);
       }
 
