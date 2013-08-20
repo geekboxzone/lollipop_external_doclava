@@ -83,7 +83,36 @@ public class PackageInfo extends DocInfo implements ContainerInfo {
 
   @Override
   public boolean isHidden() {
-    return comment().isHidden();
+    if (mHidden == -1) {
+      if (hasHideComment()) {
+        // We change the hidden value of the package if a class wants to be not hidden.
+        ClassInfo[][] types = new ClassInfo[][] { interfaces(), ordinaryClasses(), enums(), exceptions() };
+        for (ClassInfo[] type : types) {
+          if (type != null) {
+            for (ClassInfo c : type) {
+              if (c.hasShowAnnotation()) {
+                mHidden = 0;
+                return false;
+              }
+            }
+          }
+        }
+        mHidden = 1;
+      } else {
+        mHidden = 0;
+      }
+    }
+    return mHidden != 0;
+  }
+
+  /**
+   * Used by ClassInfo to determine packages default visability before annoations.
+   */
+  public boolean hasHideComment() {
+    if (mHiddenByComment == -1) {
+      mHiddenByComment = comment().isHidden() ? 1 : 0;
+    }
+    return mHiddenByComment != 0;
   }
 
   public boolean checkLevel() {
@@ -190,6 +219,8 @@ public class PackageInfo extends DocInfo implements ContainerInfo {
     return mName.hashCode();
   }
 
+  private int mHidden = -1;
+  private int mHiddenByComment = -1;
   private String mName;
   private PackageDoc mPackage;
   private ApiInfo mContainingApi;

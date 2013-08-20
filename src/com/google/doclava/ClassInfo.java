@@ -1208,21 +1208,28 @@ public class ClassInfo extends DocInfo implements ContainerInfo, Comparable, Sco
   public boolean isHiddenImpl() {
     ClassInfo cl = this;
     while (cl != null) {
-      PackageInfo pkg = cl.containingPackage();
-      if (pkg != null && pkg.isHidden()) {
-        return true;
+      if (cl.hasShowAnnotation()) {
+        return false;
       }
-      if (cl.annotations() != null) {
-        for (AnnotationInstanceInfo info : cl.annotations()) {
-          if (Doclava.showAnnotations.contains(info.type().qualifiedName())) {
-            return false;
-          }
-        }
+      PackageInfo pkg = cl.containingPackage();
+      if (pkg != null && pkg.hasHideComment()) {
+        return true;
       }
       if (cl.comment().isHidden()) {
         return true;
       }
       cl = cl.containingClass();
+    }
+    return false;
+  }
+
+  public boolean hasShowAnnotation() {
+    if (annotations() != null) {
+      for (AnnotationInstanceInfo info : annotations()) {
+        if (Doclava.showAnnotations.contains(info.type().qualifiedName())) {
+          return true;
+        }
+      }
     }
     return false;
   }
