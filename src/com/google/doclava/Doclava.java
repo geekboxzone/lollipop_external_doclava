@@ -91,6 +91,7 @@ public class Doclava {
 
   private static boolean gmsRef = false;
   private static boolean gcmRef = false;
+  private static boolean samplesRef = false;
   private static boolean sac = false;
 
   public static boolean checkLevel(int level) {
@@ -322,8 +323,13 @@ public class Doclava {
 
       writeAssets();
 
+      // Sample code pages
+      if (samplesRef) {
+        writeSamples(offlineMode, sampleCodes);
+      }
+      
       // Navigation tree
-       String refPrefix = new String();
+      String refPrefix = new String();
       if(gmsRef){
         refPrefix = "gms-";
       } else if(gcmRef){
@@ -349,11 +355,6 @@ public class Doclava {
       writeLists();
       if (keepListFile != null) {
         writeKeepList(keepListFile);
-      }
-
-      // Sample Code
-      for (SampleCode sc : sampleCodes) {
-        sc.write(offlineMode);
       }
 
       // Index page
@@ -519,7 +520,11 @@ public class Doclava {
       return 2;
     }
     if (option.equals("-samplecode")) {
+      samplesRef = true;
       return 4;
+    }
+    if (option.equals("-devsite")) {
+      return 1;
     }
     if (option.equals("-htmldir")) {
       return 2;
@@ -1645,4 +1650,20 @@ public class Doclava {
   static String ensureSlash(String path) {
     return path.endsWith("/") ? path : path + "/";
   }
+
+  /**
+  * Process samples dirs that are specified in Android.mk. Generate html
+  * wrapped pages, copy files to output dir, and generate a SampleCode NavTree.
+  */
+  public static void writeSamples(boolean offlineMode, ArrayList<SampleCode> sampleCodes) {
+    // Go through SCs processing files. Create a root list for SC nodes,
+    // pass it to SCs for their NavTree children and append them.
+    List<SampleCode.Node> samplesList = new ArrayList<SampleCode.Node>();
+    for (SampleCode sc : sampleCodes) {
+      samplesList.add(sc.write(offlineMode));
+    }
+    // Pass full samplesList to SC to render to js file.
+    SampleCode.writeSamplesNavTree(samplesList);
+  }
+
 }
