@@ -157,6 +157,8 @@ public class DocFile {
         hdf.setValue("more", "true");
       } else if (filename.indexOf("google") == 0) {
         hdf.setValue("google", "true");
+      } else if (filename.indexOf("samples") == 0) {
+        hdf.setValue("samples", "true");
       } else if (filename.indexOf("distribute") == 0) {
         hdf.setValue("distribute", "true");
       } else if (filename.indexOf("about") == 0) {
