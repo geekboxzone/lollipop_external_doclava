@@ -324,7 +324,7 @@ public class Doclava {
       writeAssets();
 
       // Sample code pages
-      if (samplesRef) {
+      if ((samplesRef) && (!offlineMode)) {
         writeSamples(offlineMode, sampleCodes);
       }
       
