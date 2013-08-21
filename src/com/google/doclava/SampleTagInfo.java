@@ -108,9 +108,8 @@ public class SampleTagInfo extends TagInfo {
 
   static String addLineNumber(String line, String num) {
     StringBuilder numberedLine = new StringBuilder();
-    numberedLine.append("<li id=\"" + num + "\">");
-    numberedLine.append(line);
-    numberedLine.append("</li>");
+    numberedLine.append("<a class=\"number\"" + "href=\"#l" + num + "\">" + num + "\n</a>");
+    numberedLine.append("<span class=\"code-line\" id=\"l" + num + "\">" + line + "</span>");
     return numberedLine.substring(0);
   }
 
