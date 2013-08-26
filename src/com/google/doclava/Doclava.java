@@ -324,8 +324,9 @@ public class Doclava {
       writeAssets();
 
       // Sample code pages
-      if ((samplesRef) && (!offlineMode)) {
-        writeSamples(offlineMode, sampleCodes);
+      if (samplesRef) {
+        //always write samples without offlineMode behaviors
+        writeSamples(false, sampleCodes);
       }
       
       // Navigation tree
@@ -1662,8 +1663,10 @@ public class Doclava {
     for (SampleCode sc : sampleCodes) {
       samplesList.add(sc.write(offlineMode));
     }
-    // Pass full samplesList to SC to render to js file.
-    SampleCode.writeSamplesNavTree(samplesList);
+    // Pass full samplesList to SC to render to js file
+    if (!offlineMode) {
+      SampleCode.writeSamplesNavTree(samplesList);
+    }
   }
 
 }
