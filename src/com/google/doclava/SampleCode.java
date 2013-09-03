@@ -26,10 +26,12 @@ public class SampleCode {
   String mDest;
   String mTitle;
   String mProjectDir;
+  String mTags;
 
   public SampleCode(String source, String dest, String title) {
     mSource = source;
     mTitle = title;
+    mTags = null;
 
     int len = dest.length();
     if (len > 1 && dest.charAt(len - 1) != '/') {
@@ -71,7 +73,7 @@ public class SampleCode {
       hdf.removeTree("parentdirs");
       hdf.setValue("parentdirs.0.Name", name);
       // return a root SC node for the sample with children appended
-      return new Node(mProjectDir, "samples/" + startname + "/index.html", filelist, null);
+      return new Node(mProjectDir, "samples/" + startname + "/index.html", mTags, filelist, null);
     }
     return null;
   }
@@ -149,6 +151,7 @@ public class SampleCode {
            hdf.setValue(key + i + ".Type", "img");
            hdf.setValue(key + i + ".Name", name);
            hdf.setValue(key + i + ".Href", link);
+           hdf.setValue(key + i + ".RelPath", relative);
          }
          if (inList(path, TEMPLATED)) {
            // copied and goes through the template
@@ -158,9 +161,10 @@ public class SampleCode {
            hdf.setValue(key + i + ".Type", type);
            hdf.setValue(key + i + ".Name", name);
            hdf.setValue(key + i + ".Href", link);
+           hdf.setValue(key + i + ".RelPath", relative);
          }
          // add file to the navtree
-         parent.add(new Node(name, link , null, type));
+         parent.add(new Node(name, link , null, null, type));
          i++;
        } else if (f.isDirectory()) {
          List<Node> mchildren = new ArrayList<Node>();
@@ -178,12 +182,13 @@ public class SampleCode {
          if (mchildren.size() > 0) {
            //dir is processed, now add it to the navtree
            //don't link sidenav subdirs at this point (but can use "link" to do so)
-          parent.add(new Node(name, null, mchildren, type));
+          parent.add(new Node(name, null, null, mchildren, type));
          }
          dirs.add(name);
 
          i++;
        }
+
     }
     //dd not working yet
     //Get summary from any _index files in any project dirs (currently disabled)
@@ -198,9 +203,9 @@ public class SampleCode {
       hdf.setValue("showProjectPaths","true");//dd remove here?
     }
     setParentDirs(hdf, relative, name, false);
-    //System.out.println("writing  sample index -- " + relative + "index" + Doclava.htmlExtension);
-    //hdf.setValue("projectTitle", mTitle);
-    //ClearPage.write(hdf, "sampleindex.cs", relative + "/index" + Doclava.htmlExtension);
+    //concatenate dirs in the navtree. Comment out or remove to restore
+    //normal nav tree.
+    squashNodes(parent);
   }
 
   public void writeProjectStructure(String dir, Data hdf) {
@@ -217,11 +222,11 @@ public class SampleCode {
   * Write the project's templated _index.html 
   */
   public void writeProjectIndex(Data hdf) {
-      //System.out.println(">>-- writing project index for " + mDest );
-      hdf.setValue("projectDir", mProjectDir);
-      hdf.setValue("page.title", mProjectDir + " Sample");
-      hdf.setValue("projectTitle", mTitle);
-      ClearPage.write(hdf, "sampleindex.cs", mDest + "index" + Doclava.htmlExtension);
+    //System.out.println(">>-- writing project index for " + mDest );
+    hdf.setValue("projectDir", mProjectDir);
+    hdf.setValue("page.title", mProjectDir + " Sample");
+    hdf.setValue("projectTitle", mTitle);
+    ClearPage.write(hdf, "sampleindex.cs", mDest + "index" + Doclava.htmlExtension);
   }
 
   /**
@@ -274,12 +279,15 @@ public class SampleCode {
     data = Doclava.escape(data);
 
     Data hdf = Doclava.makeHDF();
+
+    String relative = subdir.replaceFirst("samples/", "");
     hdf.setValue("samples", "true");
     setParentDirs(hdf, subdir, name, true);
     hdf.setValue("projectTitle", mTitle);
     hdf.setValue("projectDir", mProjectDir);
     hdf.setValue("page.title", name);
     hdf.setValue("subdir", subdir);
+    hdf.setValue("relative", relative);
     hdf.setValue("realFile", name);
     hdf.setValue("fileContents", data);
     hdf.setValue("resTag", "sample");
@@ -314,7 +322,7 @@ public class SampleCode {
   * Render a SC node to a navtree js file.
   */
   public static void writeSamplesNavTree(List<Node> tnode) {
-    Node node = new Node("Reference", "packages.html", tnode, null);
+    Node node = new Node("Reference", "packages.html", null, tnode, null);
 
     StringBuilder buf = new StringBuilder();
     if (false) {
@@ -332,11 +340,18 @@ public class SampleCode {
     ClearPage.write(data, "samples_navtree_data.cs", "samples_navtree_data.js");
   }
 
+  /**
+  * Sort by type and name (alpha), with manifest and src always at top.
+  */
   Comparator<File> byTypeAndName = new Comparator<File>() {
     public int compare (File one, File other) {
       if (one.isDirectory() && !other.isDirectory()) {
         return 1;
       } else if (!one.isDirectory() && other.isDirectory()) {
+        return -1;
+      } else if (one.getName().equals("AndroidManifest.xml")) {
+        return -1;
+      } else if (one.getName().equals("src")) {
         return -1;
       } else {
         return one.compareTo(other);
@@ -345,17 +360,45 @@ public class SampleCode {
   };
 
   /**
+  * Concatenate dirs that only hold dirs to simplify nav tree
+  */
+  public static List<Node> squashNodes(List<Node> tnode){
+    List<Node> list = tnode;
+
+    for(int i = 0; i < list.size(); ++i) {
+      //only squash dirs that contain another dir whose list size is 1 and
+      //that don't contain endpoints
+      if ((list.get(i).getType().equals("dir")) &&
+          (list.size() == 1) &&
+          (list.get(i).getChildren().get(0).getChildren() != null)) {
+        String thisLabel = list.get(i).getLabel();
+        String childLabel =  list.get(i).getChildren().get(0).getLabel();
+        String newLabel = thisLabel + "/" + childLabel;
+        //Set label of parent and mChildren to those of child-child, skipping
+        //squashed dir
+        list.get(i).setLabel(newLabel);
+        list.get(i).setChildren(list.get(i).getChildren().get(0).getChildren());
+      } else {
+        continue;
+      }
+    }
+    return list;
+  }
+
+  /**
   * SampleCode variant of NavTree node.
   */
   public static class Node {
     private String mLabel;
     private String mLink;
-    List<Node> mChildren;
-    public String mType;
+    private String mTags;
+    private List<Node> mChildren;
+    private String mType;
 
-    Node(String label, String link, List<Node> children, String type) {
+    Node(String label, String link, String tags, List<Node> children, String type) {
       mLabel = label;
       mLink = link;
+      mTags = tags;
       mChildren = children;
       mType = type;
     }
@@ -417,6 +460,38 @@ public class SampleCode {
       buf.append(", ");
       renderString(buf, mType);
       buf.append(" ]");
+    }
+
+    public List<Node> getChildren() {
+      if (mChildren != null) {
+        return mChildren;
+      } else {
+        return null;
+      }
+    }
+
+    public void setChildren(List<Node> node) {
+        mChildren = node;
+    }
+
+    public String getLabel() {
+      return mLabel;
+    }
+
+    public void setLabel(String label) {
+       mLabel = label;
+    }
+
+    public String getType() {
+      return mType.toString();
+    }
+
+    public String getHref() {
+      return mLink;
+    }
+
+    public void setHref(String link) {
+      mLink = link;
     }
   }
 
