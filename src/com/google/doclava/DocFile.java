@@ -72,14 +72,15 @@ public class DocFile {
     return outFrag;
   }
   
-  public static void writePage(String docfile, String relative, String outfile) {
-    Data hdf = Doclava.makeHDF();
+  public static void writePage(String docfile, String relative, String outfile, Data hdf) {
 
     /*
      * System.out.println("docfile='" + docfile + "' relative='" + relative + "'" + "' outfile='" +
      * outfile + "'");
      */
-
+    if (hdf == null) {
+      hdf = Doclava.makeHDF(); 
+    } 
     String filedata = readFile(docfile);
 
     // The document is properties up until the line "@jd:body".

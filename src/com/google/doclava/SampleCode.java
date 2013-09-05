@@ -19,7 +19,8 @@ import com.google.clearsilver.jsilver.data.Data;
 
 import java.util.*;
 import java.io.*;
-
+import java.util.regex.Pattern;
+import java.util.regex.Matcher;
 
 public class SampleCode {
   String mSource;
@@ -39,7 +40,6 @@ public class SampleCode {
     } else {
       mDest = dest;
     }
-
 
     //System.out.println("SampleCode init: source: " + mSource);
     //System.out.println("SampleCode init: dest: " + mDest);
@@ -68,12 +68,13 @@ public class SampleCode {
       hdf.setValue("projectDir", mProjectDir);
       writeProjectDirectory(filelist, f, mDest, false, hdf, "Files.");
       writeProjectStructure(name, hdf);
-      getSummaryFromDir(hdf, f, "Files.");
-      writeProjectIndex(hdf);
       hdf.removeTree("parentdirs");
       hdf.setValue("parentdirs.0.Name", name);
+      //Write root _index.jd to out and add metadata to Node.
+      Node rootNode = writeProjectIndexCs(hdf, f, null, new Node(mProjectDir,
+          "samples/" + startname + "/index.html", null, null, filelist, null));
       // return a root SC node for the sample with children appended
-      return new Node(mProjectDir, "samples/" + startname + "/index.html", mTags, filelist, null);
+      return rootNode;
     }
     return null;
   }
@@ -133,6 +134,8 @@ public class SampleCode {
           name.equals("default.properties") ||
           name.equals("build.properties") ||
           name.endsWith(".ttf") ||
+          name.endsWith(".gradle") ||
+          name.endsWith(".bat") ||
           name.equals("Android.mk")) {
          //System.out.println("Invalid File Type, bypassing: " + name);
          continue;
@@ -164,7 +167,7 @@ public class SampleCode {
            hdf.setValue(key + i + ".RelPath", relative);
          }
          // add file to the navtree
-         parent.add(new Node(name, link , null, null, type));
+         parent.add(new Node(name, link, null, null, null, type));
          i++;
        } else if (f.isDirectory()) {
          List<Node> mchildren = new ArrayList<Node>();
@@ -182,10 +185,9 @@ public class SampleCode {
          if (mchildren.size() > 0) {
            //dir is processed, now add it to the navtree
            //don't link sidenav subdirs at this point (but can use "link" to do so)
-          parent.add(new Node(name, null, null, mchildren, type));
+          parent.add(new Node(name, null, null, null, mchildren, type));
          }
          dirs.add(name);
-
          i++;
        }
 
@@ -203,8 +205,9 @@ public class SampleCode {
       hdf.setValue("showProjectPaths","true");//dd remove here?
     }
     setParentDirs(hdf, relative, name, false);
-    //concatenate dirs in the navtree. Comment out or remove to restore
-    //normal nav tree.
+    //Generate an index.html page for each dir being processed
+    ClearPage.write(hdf, "sampleindex.cs", relative + "/index" + Doclava.htmlExtension);
+    //concatenate dirs in the navtree. Comment out or remove to restore normal navtree
     squashNodes(parent);
   }
 
@@ -214,55 +217,72 @@ public class SampleCode {
       hdf.setValue("projectDir", mProjectDir);
       hdf.setValue("page.title", mProjectDir + " Structure");
       hdf.setValue("projectTitle", mTitle);
-      ClearPage.write(hdf, "sampleindex.cs", mDest + "project" + Doclava.htmlExtension); //write the project.html file
+      //write the project.html file
+      ClearPage.write(hdf, "sampleindex.cs", mDest + "project" + Doclava.htmlExtension);
       hdf.setValue("projectStructure", "");
   }
 
   /**
-  * Write the project's templated _index.html 
+  * Processes a templated project index page from _index.jd in a project root.
+  * Each sample project must have an index, and each index locally defines it's own
+  * page.tags and sample.group cs vars. This method takes a SC node on input, reads
+  * any local vars from the _index.jd, generates an html file to out, then updates
+  * the SC node with the page vars and returns it to the caller.
+  *
   */
-  public void writeProjectIndex(Data hdf) {
-    //System.out.println(">>-- writing project index for " + mDest );
+  public Node writeProjectIndexCs(Data hdf, File dir, String key, Node tnode) {
+    //hdf.setValue("summary", "");
+    //hdf.setValue("summaryFlag", "");
+    String filename = dir.getAbsolutePath() + "/_index.jd";
+    File f = new File(filename);
+    String rel = dir.getPath();
+    String mGroup = "";
+    hdf.setValue("samples", "true");
+    //set any default page variables for root index
+    hdf.setValue("page.title", mProjectDir);
     hdf.setValue("projectDir", mProjectDir);
-    hdf.setValue("page.title", mProjectDir + " Sample");
     hdf.setValue("projectTitle", mTitle);
-    ClearPage.write(hdf, "sampleindex.cs", mDest + "index" + Doclava.htmlExtension);
-  }
 
-  /**
-  * Grab the contents of an _index.html summary from a dir.
-  */
-  public void getSummaryFromDir(Data hdf, File dir, String key) {
-    //System.out.println("Getting summary for " + dir + "/_index.html");
-    hdf.setValue("summary", "");
-    hdf.setValue("summaryFlag", "");
-    String filename = dir.getPath() + "/_index.html";
-    String summary = SampleTagInfo.readFile(new SourcePositionInfo(filename,
-                          -1,-1), filename, "sample code", true, false, false, true);
-    if (summary != null) {
-      hdf.setValue(key + "SummaryFlag", "true");
-      hdf.setValue("summary", summary);
-      //set the target for [info] link
-      //hdf.setValue(key + "Href", dir + "/index.html");
-      //return true;
-    } 
+    if (!f.isFile()) {
+      //The sample didn't have any _index.jd, so create a stub.
+      ClearPage.write(hdf, "sampleindex.cs", mDest + "index" + Doclava.htmlExtension);
+      //Errors.error(Errors.INVALID_SAMPLE_INDEX, null, "Sample " + mProjectDir
+      //          + ": Root _index.jd must be present and must define sample.group"
+      //          + " tag. Please see ... for details.");
+    } else {
+      DocFile.writePage(filename, rel, mDest + "index" + Doclava.htmlExtension, hdf);
+      tnode.setTags(hdf.getValue("page.tags", ""));
+      mGroup = hdf.getValue("sample.group", "");
+      if (mGroup.equals("")) {
+        //Errors.error(Errors.INVALID_SAMPLE_INDEX, null, "Sample " + mProjectDir
+        //          + ": Root _index.jd must be present and must define sample.group"
+        //          + " tag. Please see ... for details.");
+      } else {
+      tnode.setGroup(hdf.getValue("sample.group", ""));
+      }
+    }
+    return tnode;
   }
 
   /**
   * Keep track of file parents
   */
   Data setParentDirs(Data hdf, String subdir, String name, Boolean isFile) {
-    isFile = false;
+    //set whether to linkify the crumb dirs on each sample code page
+    hdf.setValue("pathCrumbLinks", "");
+        //isFile = false;
     int iter;
     hdf.removeTree("parentdirs");
-    //System.out.println("setParentDirs for " + subdir + name);
     String s = subdir;
     String urlParts[] = s.split("/");
-    int n, l = (isFile)?1:0;
-    for (iter=2; iter < urlParts.length - l; iter++) {
-      n = iter-2;
+    //int n, l = (isFile)?1:0;
+    int n, l = 1;
+    //System.out.println("setParentDirs for " + subdir + name);
+    for (iter=1; iter < urlParts.length; iter++) {
+      n = iter-1;
       //System.out.println("parentdirs." + n + ".Name == " + urlParts[iter]);
       hdf.setValue("parentdirs." + n + ".Name", urlParts[iter]);
+      hdf.setValue("parentdirs." + n + ".Link", subdir + "index" + Doclava.htmlExtension);
     }
     return hdf;
   }
@@ -322,7 +342,7 @@ public class SampleCode {
   * Render a SC node to a navtree js file.
   */
   public static void writeSamplesNavTree(List<Node> tnode) {
-    Node node = new Node("Reference", "packages.html", null, tnode, null);
+    Node node = new Node("Reference", "packages.html", null, null, tnode, null);
 
     StringBuilder buf = new StringBuilder();
     if (false) {
@@ -391,13 +411,15 @@ public class SampleCode {
   public static class Node {
     private String mLabel;
     private String mLink;
-    private String mTags;
+    private String mGroup; // from sample.group in _index.jd
+    private List<String> mTags; // from page.tags in _index.jd
     private List<Node> mChildren;
     private String mType;
 
-    Node(String label, String link, String tags, List<Node> children, String type) {
+    Node(String label, String link, String group, List<String> tags, List<Node> children, String type) {
       mLabel = label;
       mLink = link;
+      mGroup = group;
       mTags = tags;
       mChildren = children;
       mType = type;
@@ -450,11 +472,53 @@ public class SampleCode {
       }
     }
 
+    void renderTags(StringBuilder buf) {
+      List<String> list = mTags;
+      if (list == null || list.size() == 0) {
+        buf.append("null");
+      } else {
+        buf.append("[ ");
+        final int N = list.size();
+        for (int i = 0; i < N; i++) {
+          String tagval = list.get(i).toString();
+          buf.append('"');
+          final int L = tagval.length();
+          for (int t = 0; t < L; t++) {
+            char c = tagval.charAt(t);
+            if (c >= ' ' && c <= '~' && c != '"' && c != '\\') {
+              buf.append(c);
+            } else {
+              buf.append("\\u");
+              for (int m = 0; m < 4; m++) {
+                char x = (char) (c & 0x000f);
+                if (x > 10) {
+                  x = (char) (x - 10 + 'a');
+                } else {
+                  x = (char) (x + '0');
+                }
+                buf.append(x);
+                c >>= 4;
+              }
+            } 
+          }
+          buf.append('"');
+          if (i != N - 1) {
+            buf.append(", ");
+          } 
+        }
+        buf.append(" ]");
+      }
+    }
+
     void render(StringBuilder buf) {
       buf.append("[ ");
       renderString(buf, mLabel);
       buf.append(", ");
       renderString(buf, mLink);
+      buf.append(", ");
+      renderString(buf, mGroup);
+      buf.append(", ");
+      renderTags(buf);
       buf.append(", ");
       renderChildren(buf);
       buf.append(", ");
@@ -492,6 +556,57 @@ public class SampleCode {
 
     public void setHref(String link) {
       mLink = link;
+    }
+
+    public void setGroup(String group) {
+      mGroup = group;
+    }
+
+    public void setTagss(String tags) {
+    }
+
+    public void setTags(String tags) {
+      List<String> tagList = new ArrayList();
+      String[] tagParts = tags.split(",");
+
+      for (int iter = 0; iter < tagParts.length; iter++) {
+        String item = tagParts[iter].replaceAll("\"", "").trim();
+        tagList.add(item);
+      }
+      mTags = tagList;
+    }
+  }
+
+  /**
+  * Write the project's templated _index.html
+  * @deprecated
+  *
+  */
+  public void writeProjectIndex(Data hdf) {
+    //System.out.println(">>-- writing project index for " + mDest );
+    hdf.setValue("projectDir", mProjectDir);
+    hdf.setValue("page.title", mProjectDir + " Sample");
+    hdf.setValue("projectTitle", mTitle);
+    ClearPage.write(hdf, "sampleindex.cs", mDest + "index" + Doclava.htmlExtension);
+  }
+
+  /**
+  * Grab the contents of an _index.html summary from a dir.
+  * @deprecated
+  */
+  public void getSummaryFromDir(Data hdf, File dir, String key) {
+    //System.out.println("Getting summary for " + dir + "/_index.html");
+    hdf.setValue("summary", "");
+    hdf.setValue("summaryFlag", "");
+    String filename = dir.getPath() + "/_index.html";
+    String summary = SampleTagInfo.readFile(new SourcePositionInfo(filename,
+                          -1,-1), filename, "sample code", true, false, false, true);
+    if (summary != null) {
+      hdf.setValue(key + "SummaryFlag", "true");
+      hdf.setValue("summary", summary);
+      //set the target for [info] link
+      //hdf.setValue(key + "Href", dir + "/index.html");
+      //return true;
     }
   }
 
