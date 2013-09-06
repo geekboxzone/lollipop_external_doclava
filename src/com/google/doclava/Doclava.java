@@ -747,7 +747,7 @@ public class Doclava {
           ClearPage.write(data, templ, filename, js);
         } else if (len > 3 && ".jd".equals(templ.substring(len - 3))) {
           String filename = templ.substring(0, len - 3) + htmlExtension;
-          DocFile.writePage(f.getAbsolutePath(), relative, filename);
+          DocFile.writePage(f.getAbsolutePath(), relative, filename, null);
         } else if(!f.getName().equals(".DS_Store")){
               Data data = makeHDF();
               String hdfValue = data.getValue("sac") == null ? "" : data.getValue("sac");
