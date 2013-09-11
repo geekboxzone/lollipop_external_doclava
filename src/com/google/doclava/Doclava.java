@@ -922,7 +922,22 @@ public class Doclava {
               title.concat(splitTitle[j]);
             }
           }
-          String tags = hdf.getValue("page.tags", "");
+
+          StringBuilder tags =  new StringBuilder();
+          String tagList = hdf.getValue("page.tags", "");
+          if (!tagList.equals("")) {
+            tagList = tagList.replaceAll("\"", "");
+            String[] tagParts = tagList.split(",");
+            for (int iter = 0; iter < tagParts.length; iter++) {
+              tags.append("\"");
+              tags.append(tagParts[iter].trim());
+              tags.append("\"");
+              if (iter < tagParts.length - 1) {
+                tags.append(",");
+              }
+            }
+          }
+
           String dirName = (webPath.indexOf("/") != -1)
                   ? webPath.substring(0, webPath.indexOf("/")) : "";
 
@@ -931,7 +946,7 @@ public class Doclava {
               !hdf.getBooleanValue("excludeFromSuggestions")) {
             data.setValue("docs.pages." + counter.i + ".label", title);
             data.setValue("docs.pages." + counter.i + ".link", webPath);
-            data.setValue("docs.pages." + counter.i + ".tags", tags);
+            data.setValue("docs.pages." + counter.i + ".tags", tags.toString());
             data.setValue("docs.pages." + counter.i + ".type", dirName);
             counter.i++;
           }
