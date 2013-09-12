@@ -1691,7 +1691,8 @@ public class Doclava {
     if (sortNavByGroups) {
       sampleGroupsRootNodes = new ArrayList<SampleCode.Node>();
       for (SampleCode gsc : sampleCodeGroups) {
-        sampleGroupsRootNodes.add(new SampleCode.Node(gsc.mTitle, null, null, null, null,
+        String link = "samples/index.html?" + gsc.mTitle.replaceAll(" ", "").trim();
+        sampleGroupsRootNodes.add(new SampleCode.Node(gsc.mTitle, link, null, null, null,
             "groupholder"));
       }
     }
