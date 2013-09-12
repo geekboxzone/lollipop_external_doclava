@@ -65,6 +65,8 @@ public class Doclava {
 
   public static int showLevel = SHOW_PROTECTED;
 
+  public static final boolean SORT_BY_NAV_GROUPS = true;
+
   public static String outputPathBase = "/";
   public static ArrayList<String> inputPathHtmlDirs = new ArrayList<String>();
   public static ArrayList<String> inputPathHtmlDir2 = new ArrayList<String>();
@@ -76,6 +78,7 @@ public class Doclava {
 
   public static RootDoc root;
   public static ArrayList<String[]> mHDFData = new ArrayList<String[]>();
+  public static ArrayList<SampleCode> sampleCodeGroups = new ArrayList<SampleCode>();
   public static Map<Character, String> escapeChars = new HashMap<Character, String>();
   public static String title = "";
   public static SinceTagger sinceTagger = new SinceTagger();
@@ -163,6 +166,8 @@ public class Doclava {
         ClearPage.toroot = a[1];
       } else if (a[0].equals("-samplecode")) {
         sampleCodes.add(new SampleCode(a[1], a[2], a[3]));
+      } else if (a[0].equals("-samplegroup")) {
+        sampleCodeGroups.add(new SampleCode(null, null, a[1]));
       //the destination output path for main htmldir
       } else if (a[0].equals("-htmldir")) {
         inputPathHtmlDirs.add(a[1]);
@@ -325,8 +330,8 @@ public class Doclava {
 
       // Sample code pages
       if (samplesRef) {
-        //always write samples without offlineMode behaviors
-        writeSamples(false, sampleCodes);
+        // always write samples without offlineMode behaviors
+        writeSamples(false, sampleCodes, SORT_BY_NAV_GROUPS);
       }
       
       // Navigation tree
@@ -523,6 +528,9 @@ public class Doclava {
     if (option.equals("-samplecode")) {
       samplesRef = true;
       return 4;
+    }
+    if (option.equals("-samplegroup")) {
+      return 2;
     }
     if (option.equals("-devsite")) {
       return 1;
@@ -1656,16 +1664,25 @@ public class Doclava {
   * Process samples dirs that are specified in Android.mk. Generate html
   * wrapped pages, copy files to output dir, and generate a SampleCode NavTree.
   */
-  public static void writeSamples(boolean offlineMode, ArrayList<SampleCode> sampleCodes) {
+  public static void writeSamples(boolean offlineMode, ArrayList<SampleCode> sampleCodes,
+      boolean sortNavByGroups) {
     // Go through SCs processing files. Create a root list for SC nodes,
     // pass it to SCs for their NavTree children and append them.
     List<SampleCode.Node> samplesList = new ArrayList<SampleCode.Node>();
+    List<SampleCode.Node> sampleGroupsRootNodes = null;
     for (SampleCode sc : sampleCodes) {
       samplesList.add(sc.write(offlineMode));
     }
+    if (sortNavByGroups) {
+      sampleGroupsRootNodes = new ArrayList<SampleCode.Node>();
+      for (SampleCode gsc : sampleCodeGroups) {
+        sampleGroupsRootNodes.add(new SampleCode.Node(gsc.mTitle, null, null, null, null,
+            "groupholder"));
+      }
+    }
     // Pass full samplesList to SC to render to js file
     if (!offlineMode) {
-      SampleCode.writeSamplesNavTree(samplesList);
+      SampleCode.writeSamplesNavTree(samplesList, sampleGroupsRootNodes);
     }
   }
 
