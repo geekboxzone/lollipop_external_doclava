@@ -34,13 +34,14 @@ public class SampleCode {
     mTitle = title;
     mTags = null;
 
-    int len = dest.length();
-    if (len > 1 && dest.charAt(len - 1) != '/') {
-      mDest = dest + '/';
-    } else {
-      mDest = dest;
+    if (dest != null) {
+      int len = dest.length();
+      if (len > 1 && dest.charAt(len - 1) != '/') {
+        mDest = dest + '/';
+      } else {
+        mDest = dest;
+      }
     }
-
     //System.out.println("SampleCode init: source: " + mSource);
     //System.out.println("SampleCode init: dest: " + mDest);
     //System.out.println("SampleCode init: title: " + mTitle);
@@ -341,8 +342,16 @@ public class SampleCode {
   /**
   * Render a SC node to a navtree js file.
   */
-  public static void writeSamplesNavTree(List<Node> tnode) {
+  public static void writeSamplesNavTree(List<Node> tnode, List<Node> groupnodes) {
+
     Node node = new Node("Reference", "packages.html", null, null, tnode, null);
+
+    if (groupnodes != null) {
+      for (int i = 0; i < tnode.size(); i++) {
+        groupnodes = appendNodeGroups(tnode.get(i), groupnodes);
+      }
+      node.setChildren(groupnodes);
+    }
 
     StringBuilder buf = new StringBuilder();
     if (false) {
@@ -358,6 +367,27 @@ public class SampleCode {
     Data data = Doclava.makeHDF();
     data.setValue("reference_tree", buf.toString());
     ClearPage.write(data, "samples_navtree_data.cs", "samples_navtree_data.js");
+  }
+
+  /**
+  * Iterate the list of projects and sort them by their groups. Samples the reference
+  * a valid sample group tag are added to a list for that group. Samples declare a
+  * sample.group tag in their _index.jd files.
+  */
+  private static List<Node> appendNodeGroups(Node gNode, List<Node> groupnodes) {
+    List<Node> mgrouplist = new ArrayList<Node>();
+    final int N = groupnodes.size();
+    for (int i = 0; i < N; i++) {
+      if (groupnodes.get(i).getLabel().equals(gNode.getGroup())) {
+        if (groupnodes.get(i).getChildren() == null) {
+          groupnodes.get(i).setChildren(mgrouplist);
+        }
+        mgrouplist.add(gNode);
+        //System.out.println("Added " + gNode.getLabel() + " to group " + group);
+        break;
+      } //?? no match
+    }
+    return groupnodes;
   }
 
   /**
@@ -382,7 +412,7 @@ public class SampleCode {
   /**
   * Concatenate dirs that only hold dirs to simplify nav tree
   */
-  public static List<Node> squashNodes(List<Node> tnode){
+  public static List<Node> squashNodes(List<Node> tnode) {
     List<Node> list = tnode;
 
     for(int i = 0; i < list.size(); ++i) {
@@ -558,11 +588,12 @@ public class SampleCode {
       mLink = link;
     }
 
-    public void setGroup(String group) {
-      mGroup = group;
+    public String getGroup() {
+      return mGroup;
     }
 
-    public void setTagss(String tags) {
+    public void setGroup(String group) {
+      mGroup = group;
     }
 
     public void setTags(String tags) {
