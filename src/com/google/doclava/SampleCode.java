@@ -340,7 +340,7 @@ public class SampleCode {
   }
 
   /**
-  * Render a SC node to a navtree js file.
+  * Render a SC node tree to a navtree js file. 
   */
   public static void writeSamplesNavTree(List<Node> tnode, List<Node> groupnodes) {
 
@@ -349,6 +349,12 @@ public class SampleCode {
     if (groupnodes != null) {
       for (int i = 0; i < tnode.size(); i++) {
         groupnodes = appendNodeGroups(tnode.get(i), groupnodes);
+      }
+      for (int n = 0; n < groupnodes.size(); n++) {
+        if (groupnodes.get(n).getChildren() == null) {
+          groupnodes.remove(n);
+          n--;
+        }
       }
       node.setChildren(groupnodes);
     }
@@ -370,22 +376,23 @@ public class SampleCode {
   }
 
   /**
-  * Iterate the list of projects and sort them by their groups. Samples the reference
-  * a valid sample group tag are added to a list for that group. Samples declare a
-  * sample.group tag in their _index.jd files.
+  * For a given project root node, get the group and then iterate the list of valid
+  * groups looking for a match. If found, append the project to that group node.
+  * Samples the reference a valid sample group tag are added to a list for that
+  * group. Samples declare a sample.group tag in their _index.jd files.
   */
   private static List<Node> appendNodeGroups(Node gNode, List<Node> groupnodes) {
     List<Node> mgrouplist = new ArrayList<Node>();
-    final int N = groupnodes.size();
-    for (int i = 0; i < N; i++) {
+    for (int i = 0; i < groupnodes.size(); i++) {
       if (groupnodes.get(i).getLabel().equals(gNode.getGroup())) {
         if (groupnodes.get(i).getChildren() == null) {
+          mgrouplist.add(gNode);
           groupnodes.get(i).setChildren(mgrouplist);
+        } else {
+          groupnodes.get(i).getChildren().add(gNode);
         }
-        mgrouplist.add(gNode);
-        //System.out.println("Added " + gNode.getLabel() + " to group " + group);
         break;
-      } //?? no match
+      }
     }
     return groupnodes;
   }
