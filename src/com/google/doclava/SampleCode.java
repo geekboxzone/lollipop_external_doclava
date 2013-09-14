@@ -72,8 +72,9 @@ public class SampleCode {
       hdf.removeTree("parentdirs");
       hdf.setValue("parentdirs.0.Name", name);
       //Write root _index.jd to out and add metadata to Node.
-      Node rootNode = writeProjectIndexCs(hdf, f, null, new Node(mProjectDir,
-          "samples/" + startname + "/index.html", null, null, filelist, null));
+      Node rootNode = writeProjectIndexCs(hdf, f, null,
+          new Node.Builder().setLabel(mProjectDir).setLink("samples/"
+          + startname + "/index.html").setChildren(filelist).build());
       // return a root SC node for the sample with children appended
       return rootNode;
     }
@@ -168,7 +169,7 @@ public class SampleCode {
            hdf.setValue(key + i + ".RelPath", relative);
          }
          // add file to the navtree
-         parent.add(new Node(name, link, null, null, null, type));
+         parent.add(new Node.Builder().setLabel(name).setLink(link).setType(type).build());
          i++;
        } else if (f.isDirectory()) {
          List<Node> mchildren = new ArrayList<Node>();
@@ -186,7 +187,7 @@ public class SampleCode {
          if (mchildren.size() > 0) {
            //dir is processed, now add it to the navtree
            //don't link sidenav subdirs at this point (but can use "link" to do so)
-          parent.add(new Node(name, null, null, null, mchildren, type));
+          parent.add(new Node.Builder().setLabel(name).setChildren(mchildren).setType(type).build());
          }
          dirs.add(name);
          i++;
@@ -252,6 +253,7 @@ public class SampleCode {
       //          + " tag. Please see ... for details.");
     } else {
       DocFile.writePage(filename, rel, mDest + "index" + Doclava.htmlExtension, hdf);
+      PageMetadata.setPageMetadata(f, rel, mDest + "index" + Doclava.htmlExtension, hdf, Doclava.sTaglist);
       tnode.setTags(hdf.getValue("page.tags", ""));
       mGroup = hdf.getValue("sample.group", "");
       if (mGroup.equals("")) {
@@ -340,11 +342,12 @@ public class SampleCode {
   }
 
   /**
-  * Render a SC node tree to a navtree js file. 
+  * Render a SC node tree to a navtree js file.
   */
   public static void writeSamplesNavTree(List<Node> tnode, List<Node> groupnodes) {
 
-    Node node = new Node("Reference", "packages.html", null, null, tnode, null);
+    Node node = new
+        Node.Builder().setLabel("Reference").setLink("packages.html").setChildren(tnode).build();
 
     if (groupnodes != null) {
       for (int i = 0; i < tnode.size(); i++) {
@@ -378,7 +381,7 @@ public class SampleCode {
   /**
   * For a given project root node, get the group and then iterate the list of valid
   * groups looking for a match. If found, append the project to that group node.
-  * Samples the reference a valid sample group tag are added to a list for that
+  * Samples that reference a valid sample group tag are added to a list for that
   * group. Samples declare a sample.group tag in their _index.jd files.
   */
   private static List<Node> appendNodeGroups(Node gNode, List<Node> groupnodes) {
@@ -453,14 +456,40 @@ public class SampleCode {
     private List<Node> mChildren;
     private String mType;
 
-    Node(String label, String link, String group, List<String> tags, List<Node> children, String type) {
-      mLabel = label;
-      mLink = link;
-      mGroup = group;
-      mTags = tags;
-      mChildren = children;
-      mType = type;
+    private Node(Builder builder) {
+      mLabel = builder.mLabel;
+      mLink = builder.mLink;
+      mGroup = builder.mGroup;
+      mTags = builder.mTags;
+      mChildren = builder.mChildren;
+      mType = builder.mType;
     }
+
+    public static class Builder {
+      private String mLabel, mLink, mGroup, mType;
+      private List<String> mTags = null;
+      private List<Node> mChildren = null;
+      public Builder setLabel(String mLabel) { this.mLabel = mLabel; return this;}
+      public Builder setLink(String mLink) { this.mLink = mLink; return this;}
+      public Builder setGroup(String mGroup) { this.mGroup = mGroup; return this;}
+      public Builder setTags(List<String> mTags) { this.mTags = mTags; return this;}
+      public Builder setChildren(List<Node> mChildren) { this.mChildren = mChildren; return this;}
+      public Builder setType(String mType) { this.mType = mType; return this;}
+      public Node build() {return new Node(this);}
+    }
+
+    public Node(String mLabel,
+      String mLink,
+      String mGroup,
+      List<String> mTags,
+      List<Node> mChildren,
+      String mType) {
+      this.mLabel = mLabel;
+      this.mLink = mLink;
+      this.mGroup = mGroup;
+      this.mTags = mTags;
+      this.mChildren = mChildren;
+      this.mType = mType; }
 
     static void renderString(StringBuilder buf, String s) {
       if (s == null) {
