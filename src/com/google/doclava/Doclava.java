@@ -688,7 +688,7 @@ public class Doclava {
       Boolean allHidden = true;
       int pass = 0;
       ClassInfo[] classesToCheck = null;
-      while (pass < 5) {
+      while (pass < 6) {
         switch (pass) {
           case 0:
             classesToCheck = pkg.ordinaryClasses();
@@ -704,6 +704,9 @@ public class Doclava {
             break;
           case 4:
             classesToCheck = pkg.interfaces();
+            break;
+          case 5:
+            classesToCheck = pkg.annotations();
             break;
           default:
             System.err.println("Error reading package: " + pkg.name());
@@ -1055,7 +1058,7 @@ public class Doclava {
       Boolean allHidden = true;
       int pass = 0;
       ClassInfo[] classesToCheck = null;
-      while (pass < 5) {
+      while (pass < 6) {
         switch (pass) {
           case 0:
             classesToCheck = pkg.ordinaryClasses();
@@ -1071,6 +1074,9 @@ public class Doclava {
             break;
           case 4:
             classesToCheck = pkg.interfaces();
+            break;
+          case 5:
+            classesToCheck = pkg.annotations();
             break;
           default:
             System.err.println("Error reading package: " + pkg.name());
@@ -1134,6 +1140,7 @@ public class Doclava {
     data.setValue("package.descr", "...description...");
     pkg.setFederatedReferences(data, "package");
 
+    makeClassListHDF(data, "package.annotations", ClassInfo.sortByName(pkg.annotations()));
     makeClassListHDF(data, "package.interfaces", ClassInfo.sortByName(pkg.interfaces()));
     makeClassListHDF(data, "package.classes", ClassInfo.sortByName(pkg.ordinaryClasses()));
     makeClassListHDF(data, "package.enums", ClassInfo.sortByName(pkg.enums()));
