@@ -61,6 +61,7 @@ public class PackageInfo extends DocInfo implements ContainerInfo {
   }
 
   private void initializeMaps() {
+      mAnnotationsMap = new HashMap<String, ClassInfo>();
       mInterfacesMap = new HashMap<String, ClassInfo>();
       mOrdinaryClassesMap = new HashMap<String, ClassInfo>();
       mEnumsMap = new HashMap<String, ClassInfo>();
@@ -86,7 +87,7 @@ public class PackageInfo extends DocInfo implements ContainerInfo {
     if (mHidden == -1) {
       if (hasHideComment()) {
         // We change the hidden value of the package if a class wants to be not hidden.
-        ClassInfo[][] types = new ClassInfo[][] { interfaces(), ordinaryClasses(), enums(), exceptions() };
+        ClassInfo[][] types = new ClassInfo[][] { annotations(), interfaces(), ordinaryClasses(), enums(), exceptions() };
         for (ClassInfo[] type : types) {
           if (type != null) {
             for (ClassInfo c : type) {
@@ -159,12 +160,21 @@ public class PackageInfo extends DocInfo implements ContainerInfo {
 
   public void makeClassLinkListHDF(Data data, String base) {
     makeLink(data, base);
+    ClassInfo.makeLinkListHDF(data, base + ".annotations", annotations());
     ClassInfo.makeLinkListHDF(data, base + ".interfaces", interfaces());
     ClassInfo.makeLinkListHDF(data, base + ".classes", ordinaryClasses());
     ClassInfo.makeLinkListHDF(data, base + ".enums", enums());
     ClassInfo.makeLinkListHDF(data, base + ".exceptions", exceptions());
     ClassInfo.makeLinkListHDF(data, base + ".errors", errors());
     data.setValue(base + ".since", getSince());
+  }
+
+  public ClassInfo[] annotations() {
+    if (mAnnotations == null) {
+      mAnnotations =
+          ClassInfo.sortByName(filterHidden(Converter.convertClasses(mPackage.annotationTypes())));
+    }
+    return mAnnotations;
   }
 
   public ClassInfo[] interfaces() {
@@ -224,12 +234,14 @@ public class PackageInfo extends DocInfo implements ContainerInfo {
   private String mName;
   private PackageDoc mPackage;
   private ApiInfo mContainingApi;
+  private ClassInfo[] mAnnotations;
   private ClassInfo[] mInterfaces;
   private ClassInfo[] mOrdinaryClasses;
   private ClassInfo[] mEnums;
   private ClassInfo[] mExceptions;
   private ClassInfo[] mErrors;
 
+  private HashMap<String, ClassInfo> mAnnotationsMap;
   private HashMap<String, ClassInfo> mInterfacesMap;
   private HashMap<String, ClassInfo> mOrdinaryClassesMap;
   private HashMap<String, ClassInfo> mEnumsMap;
@@ -261,8 +273,22 @@ public class PackageInfo extends DocInfo implements ContainerInfo {
       if (cls != null) {
           return cls;
       }
+      cls = mAnnotationsMap.get(className);
+
+      if (cls != null) {
+          return cls;
+      }
 
       return mErrorsMap.get(className);
+  }
+
+  public void addAnnotation(ClassInfo cls) {
+      cls.setPackage(this);
+      mAnnotationsMap.put(cls.name(), cls);
+  }
+
+  public ClassInfo getAnnotation(String annotationName) {
+      return mAnnotationsMap.get(annotationName);
   }
 
   public void addInterface(ClassInfo cls) {
