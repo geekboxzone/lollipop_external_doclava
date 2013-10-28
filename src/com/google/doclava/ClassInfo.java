@@ -1320,12 +1320,24 @@ public class ClassInfo extends DocInfo implements ContainerInfo, Comparable, Sco
     // from there.
     String[] nodes = className.split("\\.");
     ClassDoc cl = mClass;
-    for (String n : nodes) {
+
+    int N = nodes.length;
+    for (int i = 0; i < N; ++i) {
+      final String n = nodes[i];
+      if (n.isEmpty() && i == 0) {
+        // We skip over an empty classname component if it's at location 0. This is
+        // to deal with names like ".Inner". java7 will return a bogus ClassInfo when
+        // we call "findClass("") and the next iteration of the loop will throw a
+        // runtime exception.
+        continue;
+      }
+
       cl = cl.findClass(n);
       if (cl == null) {
         return null;
       }
     }
+
     return Converter.obtainClass(cl);
   }
 
