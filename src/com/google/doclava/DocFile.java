@@ -51,7 +51,8 @@ public class DocFile {
     }
   }
 
-  public static String[] DEVSITE_VALID_LANGS = {"en", "es","ja", "ko", "ru", "zh-cn"};
+  public static String[] DEVSITE_VALID_LANGS = {"en", "es","ja", "ko",
+      "ru", "zh-cn", "zh-tw", "pt-br"};
 
   public static String getPathRoot(String filename) {
     String[] stripStr = filename.split("\\/");
@@ -148,27 +149,36 @@ public class DocFile {
       filename = getPathRoot(filename);
       if (filename.indexOf("design") == 0) {
         hdf.setValue("design", "true");
+        hdf.setValue("page.type", "design");
       } else if (filename.indexOf("develop") == 0) {
         hdf.setValue("develop", "true");
       } else if (filename.indexOf("guide") == 0) {
         hdf.setValue("guide", "true");
+        hdf.setValue("page.type", "guide");
       } else if (filename.indexOf("training") == 0) {
         hdf.setValue("training", "true");
+        hdf.setValue("page.type", "training");
       } else if (filename.indexOf("more") == 0) {
         hdf.setValue("more", "true");
       } else if (filename.indexOf("google") == 0) {
         hdf.setValue("google", "true");
+        hdf.setValue("page.type", "google");
       } else if (filename.indexOf("samples") == 0) {
         hdf.setValue("samples", "true");
+        hdf.setValue("page.type", "samples");
       } else if (filename.indexOf("distribute") == 0) {
         hdf.setValue("distribute", "true");
+        hdf.setValue("page.type", "distribute");
       } else if (filename.indexOf("about") == 0) {
         hdf.setValue("about", "true");
+        hdf.setValue("page.type", "about");
       } else if ((filename.indexOf("tools") == 0) || (filename.indexOf("sdk") == 0)) {
         hdf.setValue("tools", "true");
+        hdf.setValue("page.type", "tools");
         fromTemplate = hdf.getValue("page.template", "");
       } else if (filename.indexOf("devices") == 0) {
         hdf.setValue("devices", "true");
+        hdf.setValue("page.type", "devices");
       } else if (filename.indexOf("source") == 0) {
         hdf.setValue("source", "true");
       } else if (filename.indexOf("accessories") == 0) {
