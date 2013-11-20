@@ -78,7 +78,6 @@ public class Doclava {
 
   public static RootDoc root;
   public static ArrayList<String[]> mHDFData = new ArrayList<String[]>();
-  public static List<PageMetadata.Node> sTaglist = new ArrayList<PageMetadata.Node>();
   public static ArrayList<SampleCode> sampleCodeGroups = new ArrayList<SampleCode>();
   public static Map<Character, String> escapeChars = new HashMap<Character, String>();
   public static String title = "";
@@ -371,10 +370,6 @@ public class Doclava {
 
       if (sdkValuePath != null) {
         writeSdkValues(sdkValuePath);
-      }
-      // Write metadata for all processed files to jd_lists_unified.js in out dir
-      if (!sTaglist.isEmpty()) {
-        PageMetadata.WriteList(sTaglist);
       }
     }
 
@@ -759,14 +754,8 @@ public class Doclava {
           String filename = templ.substring(0, len - 3) + htmlExtension;
           ClearPage.write(data, templ, filename, js);
         } else if (len > 3 && ".jd".equals(templ.substring(len - 3))) {
-          Data data = makeHDF();
           String filename = templ.substring(0, len - 3) + htmlExtension;
-          DocFile.writePage(f.getAbsolutePath(), relative, filename, data);
-          String[] sections = relative.split("\\/");
-          boolean isIntl = ((sections.length > 0) && (sections[0].equals("intl")));
-          //if (!isIntl) {
-          PageMetadata.setPageMetadata(f, relative, filename, data, sTaglist);
-          //}
+          DocFile.writePage(f.getAbsolutePath(), relative, filename, null);
         } else if(!f.getName().equals(".DS_Store")){
               Data data = makeHDF();
               String hdfValue = data.getValue("sac") == null ? "" : data.getValue("sac");
@@ -943,10 +932,10 @@ public class Doclava {
           }
 
           StringBuilder tags =  new StringBuilder();
-          String tagsList = hdf.getValue("page.tags", "");
-          if (!tagsList.equals("")) {
-            tagsList = tagsList.replaceAll("\"", "");
-            String[] tagParts = tagsList.split(",");
+          String tagList = hdf.getValue("page.tags", "");
+          if (!tagList.equals("")) {
+            tagList = tagList.replaceAll("\"", "");
+            String[] tagParts = tagList.split(",");
             for (int iter = 0; iter < tagParts.length; iter++) {
               tags.append("\"");
               tags.append(tagParts[iter].trim());
@@ -1703,7 +1692,8 @@ public class Doclava {
       sampleGroupsRootNodes = new ArrayList<SampleCode.Node>();
       for (SampleCode gsc : sampleCodeGroups) {
         String link =  "samples/" + gsc.mTitle.replaceAll(" ", "").trim().toLowerCase() + ".html";
-        sampleGroupsRootNodes.add(new SampleCode.Node.Builder().setLabel(gsc.mTitle).setLink(link).setType("groupholder").build());
+        sampleGroupsRootNodes.add(new SampleCode.Node(gsc.mTitle, link, null, null, null,
+            "groupholder"));
       }
     }
     // Pass full samplesList to SC to render to js file
