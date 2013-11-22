@@ -79,6 +79,7 @@ public class Doclava {
   public static RootDoc root;
   public static ArrayList<String[]> mHDFData = new ArrayList<String[]>();
   public static List<PageMetadata.Node> sTaglist = new ArrayList<PageMetadata.Node>();
+  public static ArrayList<SampleCode> sampleCodes = new ArrayList<SampleCode>();
   public static ArrayList<SampleCode> sampleCodeGroups = new ArrayList<SampleCode>();
   public static Map<Character, String> escapeChars = new HashMap<Character, String>();
   public static String title = "";
@@ -142,7 +143,6 @@ public class Doclava {
     String proofreadFile = null;
     String todoFile = null;
     String sdkValuePath = null;
-    ArrayList<SampleCode> sampleCodes = new ArrayList<SampleCode>();
     String stubsDir = null;
     // Create the dependency graph for the stubs  directory
     boolean offlineMode = false;
@@ -169,6 +169,8 @@ public class Doclava {
         sampleCodes.add(new SampleCode(a[1], a[2], a[3]));
       } else if (a[0].equals("-samplegroup")) {
         sampleCodeGroups.add(new SampleCode(null, null, a[1]));
+      } else if (a[0].equals("-samplesdir")) {
+        getSampleProjects(new File(a[1]));
       //the destination output path for main htmldir
       } else if (a[0].equals("-htmldir")) {
         inputPathHtmlDirs.add(a[1]);
@@ -535,6 +537,10 @@ public class Doclava {
       return 4;
     }
     if (option.equals("-samplegroup")) {
+      return 2;
+    }
+    if (option.equals("-samplesdir")) {
+      samplesRef = true;
       return 2;
     }
     if (option.equals("-devsite")) {
@@ -1694,8 +1700,8 @@ public class Doclava {
   }
 
   /**
-  * Process samples dirs that are specified in Android.mk. Generate html
-  * wrapped pages, copy files to output dir, and generate a SampleCode NavTree.
+  * Process sample projects. Generate html wrapped pages, copy files to
+  * output dir, and generate a SampleCode NavTree.
   */
   public static void writeSamples(boolean offlineMode, ArrayList<SampleCode> sampleCodes,
       boolean sortNavByGroups) {
@@ -1719,4 +1725,37 @@ public class Doclava {
     }
   }
 
+  /**
+  * Given an initial samples directory root, walk through the directory collecting
+  * sample code project roots and adding them to an array of SampleCodes.
+  * @param rootDir Root directory holding all browseable sample code projects,
+  *        defined in frameworks/base/Android.mk as "-sampleDir path".
+  */
+  public static void getSampleProjects(File rootDir) {
+    for (File f : rootDir.listFiles()) {
+      String name = f.getName();
+      if (f.isDirectory()) {
+        if (isValidSampleProjectRoot(f)) {
+          sampleCodes.add(new SampleCode(f.getAbsolutePath(), "samples/" + name, name));
+        } else {
+          getSampleProjects(f);
+        }
+      }
+    }
+  }
+
+  /**
+  * Test whether a given directory is the root directory for a sample code project.
+  * Root directories must include both a src/ directory and a valid _index.jd file.
+  */
+  public static boolean isValidSampleProjectRoot(File dir) {
+    File srcDir = new File(dir.getAbsolutePath(), "src");
+    File indexJd = new File(dir.getAbsolutePath(), "_index.jd");
+    if (srcDir.exists() && indexJd.exists()) {
+      return true;
+    } else {
+      return false;
+    }
+  }
+  
 }
