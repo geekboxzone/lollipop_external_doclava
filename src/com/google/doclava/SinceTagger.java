@@ -30,7 +30,7 @@ import java.util.Map;
 
 
 /**
- * Applies version information to the DroidDoc class model from apicheck XML files. Sample usage:
+ * Applies version information to the Doclava class model from apicheck XML files. Sample usage:
  * 
  * <pre>
  *   ClassInfo[] classInfos = ...
@@ -178,7 +178,8 @@ public class SinceTagger {
    */
   private void versionFields(String versionName, ClassInfo spec, ClassInfo doc) {
     for (FieldInfo field : doc.fields()) {
-      if (field.getSince() == null && spec.allFields().containsKey(field.name())) {
+      if (field.getSince() == null && (spec.allFields().containsKey(field.name()) ||
+                                       spec.allEnums().containsKey(field.name()))) {
         field.setSince(versionName);
       }
 

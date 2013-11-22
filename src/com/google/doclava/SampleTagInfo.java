@@ -79,7 +79,7 @@ public class SampleTagInfo extends TagInfo {
     boolean trim = "@sample".equals(name);
 
     if (id == null || "".equals(id)) {
-      mIncluded = readFile(position, filename, id, trim, true, false);
+      mIncluded = readFile(position, filename, id, trim, true, false, false);
     } else {
       mIncluded = loadInclude(position, filename, id, trim);
     }
@@ -104,6 +104,13 @@ public class SampleTagInfo extends TagInfo {
     } else {
       return line.substring(0, i);
     }
+  }
+
+  static String addLineNumber(String line, String num) {
+    StringBuilder numberedLine = new StringBuilder();
+    numberedLine.append("<a class=\"number\"" + "href=\"#l" + num + "\">" + num + "\n</a>");
+    numberedLine.append("<span class=\"code-line\" id=\"l" + num + "\">" + line + "</span>");
+    return numberedLine.substring(0);
   }
 
   static String loadInclude(SourcePositionInfo pos, String filename, String id, boolean trim) {
@@ -196,20 +203,25 @@ public class SampleTagInfo extends TagInfo {
   }
 
   static String readFile(SourcePositionInfo pos, String filename, String id, boolean trim,
-      boolean escape, boolean errorOk) {
+      boolean escape, boolean numberedLines, boolean errorOk) {
     Reader input = null;
     StringBuilder result = new StringBuilder();
     int trailing = 0;
     boolean started = false;
+
     try {
+
       input = new FileReader(filename);
       LineNumberReader lines = new LineNumberReader(input);
 
       while (true) {
         String line = lines.readLine();
+        String lineNum = Integer.toString(lines.getLineNumber());
+
         if (line == null) {
           break;
         }
+
         if (trim) {
           if (isIncludeLine(line)) {
             continue;
@@ -223,15 +235,28 @@ public class SampleTagInfo extends TagInfo {
             if (escape) {
               line = escapeHtml(line);
             }
+            if (numberedLines) {
+              line = addLineNumber(line, lineNum);
+            }
             result.append(line);
             trailing = 1; // add \n next time, maybe
             started = true;
           } else {
             if (started) {
-              trailing++;
+              if (numberedLines) {
+                result.append('\n');
+                line = line + " ";
+                line = addLineNumber(line, lineNum);
+                result.append(line);
+              } else {
+                trailing++;
+              }
             }
           }
         } else {
+            if (numberedLines) {
+              line = addLineNumber(line, lineNum);
+            }
           result.append(line);
           result.append('\n');
         }

@@ -170,6 +170,7 @@ public class Errors {
   public static final Error NO_FEDERATION_DATA = new Error(117, WARNING);
   public static final Error BROKEN_SINCE_FILE = new Error(118, ERROR);
   public static final Error INVALID_CONTENT_TYPE = new Error(119, ERROR);
+  public static final Error INVALID_SAMPLE_INDEX = new Error(120, ERROR);
 
   public static final Error[] ERRORS =
       {UNRESOLVED_LINK, BAD_INCLUDE_TAG, UNKNOWN_TAG, UNKNOWN_PARAM_TAG_NAME,

@@ -72,14 +72,15 @@ public class DocFile {
     return outFrag;
   }
   
-  public static void writePage(String docfile, String relative, String outfile) {
-    Data hdf = Doclava.makeHDF();
+  public static void writePage(String docfile, String relative, String outfile, Data hdf) {
 
     /*
      * System.out.println("docfile='" + docfile + "' relative='" + relative + "'" + "' outfile='" +
      * outfile + "'");
      */
-
+    if (hdf == null) {
+      hdf = Doclava.makeHDF(); 
+    } 
     String filedata = readFile(docfile);
 
     // The document is properties up until the line "@jd:body".
@@ -157,6 +158,8 @@ public class DocFile {
         hdf.setValue("more", "true");
       } else if (filename.indexOf("google") == 0) {
         hdf.setValue("google", "true");
+      } else if (filename.indexOf("samples") == 0) {
+        hdf.setValue("samples", "true");
       } else if (filename.indexOf("distribute") == 0) {
         hdf.setValue("distribute", "true");
       } else if (filename.indexOf("about") == 0) {

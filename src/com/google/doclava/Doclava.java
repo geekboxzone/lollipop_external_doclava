@@ -65,6 +65,8 @@ public class Doclava {
 
   public static int showLevel = SHOW_PROTECTED;
 
+  public static final boolean SORT_BY_NAV_GROUPS = true;
+
   public static String outputPathBase = "/";
   public static ArrayList<String> inputPathHtmlDirs = new ArrayList<String>();
   public static ArrayList<String> inputPathHtmlDir2 = new ArrayList<String>();
@@ -76,6 +78,7 @@ public class Doclava {
 
   public static RootDoc root;
   public static ArrayList<String[]> mHDFData = new ArrayList<String[]>();
+  public static ArrayList<SampleCode> sampleCodeGroups = new ArrayList<SampleCode>();
   public static Map<Character, String> escapeChars = new HashMap<Character, String>();
   public static String title = "";
   public static SinceTagger sinceTagger = new SinceTagger();
@@ -91,6 +94,7 @@ public class Doclava {
 
   private static boolean gmsRef = false;
   private static boolean gcmRef = false;
+  private static boolean samplesRef = false;
   private static boolean sac = false;
 
   public static boolean checkLevel(int level) {
@@ -162,6 +166,8 @@ public class Doclava {
         ClearPage.toroot = a[1];
       } else if (a[0].equals("-samplecode")) {
         sampleCodes.add(new SampleCode(a[1], a[2], a[3]));
+      } else if (a[0].equals("-samplegroup")) {
+        sampleCodeGroups.add(new SampleCode(null, null, a[1]));
       //the destination output path for main htmldir
       } else if (a[0].equals("-htmldir")) {
         inputPathHtmlDirs.add(a[1]);
@@ -322,8 +328,14 @@ public class Doclava {
 
       writeAssets();
 
+      // Sample code pages
+      if (samplesRef) {
+        // always write samples without offlineMode behaviors
+        writeSamples(false, sampleCodes, SORT_BY_NAV_GROUPS);
+      }
+      
       // Navigation tree
-       String refPrefix = new String();
+      String refPrefix = new String();
       if(gmsRef){
         refPrefix = "gms-";
       } else if(gcmRef){
@@ -349,11 +361,6 @@ public class Doclava {
       writeLists();
       if (keepListFile != null) {
         writeKeepList(keepListFile);
-      }
-
-      // Sample Code
-      for (SampleCode sc : sampleCodes) {
-        sc.write(offlineMode);
       }
 
       // Index page
@@ -519,7 +526,14 @@ public class Doclava {
       return 2;
     }
     if (option.equals("-samplecode")) {
+      samplesRef = true;
       return 4;
+    }
+    if (option.equals("-samplegroup")) {
+      return 2;
+    }
+    if (option.equals("-devsite")) {
+      return 1;
     }
     if (option.equals("-htmldir")) {
       return 2;
@@ -741,7 +755,7 @@ public class Doclava {
           ClearPage.write(data, templ, filename, js);
         } else if (len > 3 && ".jd".equals(templ.substring(len - 3))) {
           String filename = templ.substring(0, len - 3) + htmlExtension;
-          DocFile.writePage(f.getAbsolutePath(), relative, filename);
+          DocFile.writePage(f.getAbsolutePath(), relative, filename, null);
         } else if(!f.getName().equals(".DS_Store")){
               Data data = makeHDF();
               String hdfValue = data.getValue("sac") == null ? "" : data.getValue("sac");
@@ -916,7 +930,22 @@ public class Doclava {
               title.concat(splitTitle[j]);
             }
           }
-          String tags = hdf.getValue("page.tags", "");
+
+          StringBuilder tags =  new StringBuilder();
+          String tagList = hdf.getValue("page.tags", "");
+          if (!tagList.equals("")) {
+            tagList = tagList.replaceAll("\"", "");
+            String[] tagParts = tagList.split(",");
+            for (int iter = 0; iter < tagParts.length; iter++) {
+              tags.append("\"");
+              tags.append(tagParts[iter].trim());
+              tags.append("\"");
+              if (iter < tagParts.length - 1) {
+                tags.append(",");
+              }
+            }
+          }
+
           String dirName = (webPath.indexOf("/") != -1)
                   ? webPath.substring(0, webPath.indexOf("/")) : "";
 
@@ -925,7 +954,7 @@ public class Doclava {
               !hdf.getBooleanValue("excludeFromSuggestions")) {
             data.setValue("docs.pages." + counter.i + ".label", title);
             data.setValue("docs.pages." + counter.i + ".link", webPath);
-            data.setValue("docs.pages." + counter.i + ".tags", tags);
+            data.setValue("docs.pages." + counter.i + ".tags", tags.toString());
             data.setValue("docs.pages." + counter.i + ".type", dirName);
             counter.i++;
           }
@@ -1645,4 +1674,32 @@ public class Doclava {
   static String ensureSlash(String path) {
     return path.endsWith("/") ? path : path + "/";
   }
+
+  /**
+  * Process samples dirs that are specified in Android.mk. Generate html
+  * wrapped pages, copy files to output dir, and generate a SampleCode NavTree.
+  */
+  public static void writeSamples(boolean offlineMode, ArrayList<SampleCode> sampleCodes,
+      boolean sortNavByGroups) {
+    // Go through SCs processing files. Create a root list for SC nodes,
+    // pass it to SCs for their NavTree children and append them.
+    List<SampleCode.Node> samplesList = new ArrayList<SampleCode.Node>();
+    List<SampleCode.Node> sampleGroupsRootNodes = null;
+    for (SampleCode sc : sampleCodes) {
+      samplesList.add(sc.write(offlineMode));
+    }
+    if (sortNavByGroups) {
+      sampleGroupsRootNodes = new ArrayList<SampleCode.Node>();
+      for (SampleCode gsc : sampleCodeGroups) {
+        String link = "samples/topic.html#t=" + gsc.mTitle.replaceAll(" ", "").trim();
+        sampleGroupsRootNodes.add(new SampleCode.Node(gsc.mTitle, link, null, null, null,
+            "groupholder"));
+      }
+    }
+    // Pass full samplesList to SC to render to js file
+    if (!offlineMode) {
+      SampleCode.writeSamplesNavTree(samplesList, sampleGroupsRootNodes);
+    }
+  }
+
 }
