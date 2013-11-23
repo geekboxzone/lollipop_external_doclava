@@ -100,8 +100,8 @@ public class SampleCode {
 
   public static String mapTypes(String name) {
     String type = name.substring(name.lastIndexOf('.') + 1, name.length());
-    if (type.equals("xml") || type.equals("java")) {
-      if (name.equals("AndroidManifest.xml")) type = "manifest";
+    if ("xml".equals(type) || "java".equals(type)) {
+      if ("AndroidManifest.xml".equals(name)) type = "manifest";
       return type;
     } else {
       return type = "file";
@@ -135,12 +135,12 @@ public class SampleCode {
       // don't process certain types of files
       if (name.startsWith(".") ||
           name.startsWith("_") ||
-          name.equals("default.properties") ||
-          name.equals("build.properties") ||
+          "default.properties".equals(name) ||
+          "build.properties".equals(name) ||
           name.endsWith(".ttf") ||
           name.endsWith(".gradle") ||
           name.endsWith(".bat") ||
-          name.equals("Android.mk")) {
+          "Android.mk".equals(name)) {
          //System.out.println("Invalid File Type, bypassing: " + name);
          continue;
        }
@@ -372,7 +372,9 @@ public class SampleCode {
 
     if (groupnodes != null) {
       for (int i = 0; i < tnode.size(); i++) {
-        groupnodes = appendNodeGroups(tnode.get(i), groupnodes);
+        if (tnode.get(i) != null) {
+          groupnodes = appendNodeGroups(tnode.get(i), groupnodes);
+        }
       }
       for (int n = 0; n < groupnodes.size(); n++) {
         if (groupnodes.get(n).getChildren() == null) {
@@ -408,7 +410,7 @@ public class SampleCode {
   private static List<Node> appendNodeGroups(Node gNode, List<Node> groupnodes) {
     List<Node> mgrouplist = new ArrayList<Node>();
     for (int i = 0; i < groupnodes.size(); i++) {
-      if (groupnodes.get(i).getLabel().equals(gNode.getGroup())) {
+      if (gNode.getGroup().equals(groupnodes.get(i).getLabel())) {
         if (groupnodes.get(i).getChildren() == null) {
           mgrouplist.add(gNode);
           groupnodes.get(i).setChildren(mgrouplist);
@@ -430,7 +432,7 @@ public class SampleCode {
         return 1;
       } else if (!one.isDirectory() && other.isDirectory()) {
         return -1;
-      } else if (one.getName().equals("AndroidManifest.xml")) {
+      } else if ("AndroidManifest.xml".equals(one.getName())) {
         return -1;
       } else {
         return one.compareTo(other);
@@ -447,7 +449,7 @@ public class SampleCode {
     for(int i = 0; i < list.size(); ++i) {
       //only squash dirs that contain another dir whose list size is 1 and
       //that don't contain endpoints
-      if ((list.get(i).getType().equals("dir")) &&
+      if (("dir".equals(list.get(i).getType())) &&
           (list.size() == 1) &&
           (list.get(i).getChildren().get(0).getChildren() != null)) {
         String thisLabel = list.get(i).getLabel();
