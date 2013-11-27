@@ -73,6 +73,47 @@ public class DocFile {
     return outFrag;
   }
   
+  public static Data getPageMetadata (String docfile, Data hdf) {
+    //utility method for extracting metadata without generating file output.
+    if (hdf == null) {
+      hdf = Doclava.makeHDF();
+    }
+    String filedata = readFile(docfile);
+
+    // The document is properties up until the line "@jd:body".
+    // Any blank lines are ignored.
+    int start = -1;
+    int lineno = 1;
+    Matcher lines = LINE.matcher(filedata);
+    String line = null;
+    while (lines.find()) {
+      line = lines.group(1);
+      if (line.length() > 0) {
+        if (line.equals("@jd:body")) {
+          start = lines.end();
+          break;
+        }
+        Matcher prop = PROP.matcher(line);
+        if (prop.matches()) {
+          String key = prop.group(1);
+          String value = prop.group(2);
+          hdf.setValue(key, value);
+        } else {
+          break;
+        }
+      }
+      lineno++;
+    }
+    if (start < 0) {
+      System.err.println(docfile + ":" + lineno + ": error parsing docfile");
+      if (line != null) {
+        System.err.println(docfile + ":" + lineno + ":" + line);
+      }
+      System.exit(1);
+    }
+    return hdf;
+  }
+
   public static void writePage(String docfile, String relative, String outfile, Data hdf) {
 
     /*
@@ -166,6 +207,7 @@ public class DocFile {
       } else if (filename.indexOf("samples") == 0) {
         hdf.setValue("samples", "true");
         hdf.setValue("page.type", "samples");
+        hdf.setValue("samples_toc_tree", Doclava.samplesNavTree.getValue("samples_toc_tree", ""));
       } else if (filename.indexOf("distribute") == 0) {
         hdf.setValue("distribute", "true");
         hdf.setValue("page.type", "distribute");
