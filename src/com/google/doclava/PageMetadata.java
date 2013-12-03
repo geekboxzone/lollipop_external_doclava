@@ -538,26 +538,8 @@ public class PageMetadata {
         return mTags;
     }
 
-    public List<String> getKeywords() {
-        return mKeywords;
-    }
-
-    public void setKeywords(String tags) {
-      if (tags.equals("")) {
-        mKeywords = null;
-      } else {
-        List<String> tagList = new ArrayList();
-        String[] tagParts = tags.split(",");
-
-        for (String t : tagParts) {
-          tagList.add(t);
-        }
-        mKeywords = tagList;
-      }
-    }
-
     public void setTags(String tags) {
-      if (tags.equals("")) {
+      if ("".equals(tags)) {
         mTags = null;
       } else {
         List<String> tagList = new ArrayList();
@@ -567,6 +549,24 @@ public class PageMetadata {
           tagList.add(t);
         }
         mTags = tagList;
+      }
+    }
+
+    public List<String> getKeywords() {
+        return mKeywords;
+    }
+
+    public void setKeywords(String keywords) {
+      if ("".equals(keywords)) {
+        mKeywords = null;
+      } else {
+        List<String> keywordList = new ArrayList();
+        String[] keywordParts = keywords.split(",");
+
+        for (String k : keywordParts) {
+          keywordList.add(k);
+        }
+        mKeywords = keywordList;
       }
     }
 
