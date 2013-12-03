@@ -15,39 +15,19 @@
  */
 
 package com.google.doclava;
-
-import java.util.Arrays;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
-import java.util.regex.Pattern;
-import java.util.regex.Matcher;
-import java.io.File;
-
 import com.google.clearsilver.jsilver.data.Data;
 
-/**
-* Represents a browsable sample code project, with methods for managing
-* metadata collection, file output, sorting, etc.
-*/
+import java.util.*;
+import java.io.*;
+import java.util.regex.Pattern;
+import java.util.regex.Matcher;
+
 public class SampleCode {
   String mSource;
   String mDest;
   String mTitle;
   String mProjectDir;
   String mTags;
-
-  /** Max size for browseable images/video. If a source file exceeds this size,
-  * a file is generated with a generic placeholder and the original file is not
-  * copied to out.
-  */
-  private static final double MAX_FILE_SIZE_BYTES = 2097152;
-
-  /** When full tree nav is enabled, generate an index for every dir
-  * and linkify the breadcrumb paths in all files.
-  */
-  private static final boolean FULL_TREE_NAVIGATION = false;
 
   public SampleCode(String source, String dest, String title) {
     mSource = source;
@@ -62,127 +42,85 @@ public class SampleCode {
         mDest = dest;
       }
     }
+    //System.out.println("SampleCode init: source: " + mSource);
+    //System.out.println("SampleCode init: dest: " + mDest);
+    //System.out.println("SampleCode init: title: " + mTitle);
+
   }
 
-  /**
-  * Iterates a given sample code project gathering  metadata for files and building
-  * a node tree that reflects the project's directory structure. After iterating
-  * the project, this method adds the project's metadata to jd_lists_unified,
-  * so that it is accessible for dynamic content and search suggestions.
-  *
-  * @param offlineMode Ignored -- offline-docs mode is not currently supported for
-  *        browsable sample code projects.
-  * @return A root Node for the project containing its metadata and tree structure. 
-  */
-  public Node setSamplesTOC(boolean offlineMode) {
+  public Node write(boolean offlineMode) {
     List<Node> filelist = new ArrayList<Node>();
     File f = new File(mSource);
     mProjectDir = f.getName();
     String name = mProjectDir;
-    String mOut = mDest + name;
+    String startname = name;
+    String subdir = mDest;
+    String mOut = subdir + name;
     if (!f.isDirectory()) {
       System.out.println("-samplecode not a directory: " + mSource);
       return null;
     }
 
-    Data hdf = Doclava.makeHDF();
-    setProjectStructure(filelist, f, mDest);
-    String link = ClearPage.toroot + "samples/" + name + "/index" + Doclava.htmlExtension;
-    Node rootNode = writeSampleIndexCs(hdf, f,
-        new Node.Builder().setLabel(mProjectDir).setLink(link).setChildren(filelist).build(),false);
-    return rootNode;
-  }
-
-  /**
-  * For a given sample code project dir, iterate through the project generating
-  * browsable html for all valid sample code files. After iterating the project
-  * generate a templated index file to the project output root.
-  *
-  * @param offlineMode Ignored -- offline-docs mode is not currently supported for
-  *        browsable sample code projects.
-  */
-  public void writeSamplesFiles(boolean offlineMode) {
-    List<Node> filelist = new ArrayList<Node>();
-    File f = new File(mSource);
-    mProjectDir = f.getName();
-    String name = mProjectDir;
-    String mOut = mDest + name;
-    if (!f.isDirectory()) {
-      System.out.println("-samplecode not a directory: " + mSource);
+    if (offlineMode)
+      writeIndexOnly(f, mDest, offlineMode);
+    else {
+      Data hdf = Doclava.makeHDF();
+      hdf.setValue("samples", "true");
+      hdf.setValue("projectDir", mProjectDir);
+      writeProjectDirectory(filelist, f, mDest, false, hdf, "Files.");
+      writeProjectStructure(name, hdf);
+      hdf.removeTree("parentdirs");
+      hdf.setValue("parentdirs.0.Name", name);
+      //Write root _index.jd to out and add metadata to Node.
+      Node rootNode = writeProjectIndexCs(hdf, f, null,
+          new Node.Builder().setLabel(mProjectDir).setLink("samples/"
+          + startname + "/index.html").setChildren(filelist).build());
+      // return a root SC node for the sample with children appended
+      return rootNode;
     }
-
-    Data hdf = Doclava.makeHDF();
-    hdf.setValue("samples_toc_tree", Doclava.samplesNavTree.getValue("samples_toc_tree", ""));
-    hdf.setValue("samples", "true");
-    hdf.setValue("projectDir", mProjectDir);
-    writeProjectDirectory(f, mDest, false, hdf, "Files.");
-    writeProjectStructure(name, hdf);
-    hdf.removeTree("parentdirs");
-    hdf.setValue("parentdirs.0.Name", name);
-    boolean writeFiles = true;
-    String link = "samples/" + name + "/index" + Doclava.htmlExtension;
-    //Write root _index.jd to out and add metadata to Node.
-    writeSampleIndexCs(hdf, f, 
-        new Node.Builder().setLabel(mProjectDir).setLink(link).build(), true);
+    return null;
   }
 
-  /**
-  * Given the root Node for a sample code project, iterates through the project
-  * gathering metadata and project tree structure. Unsupported file types are
-  * filtered from the project output. The collected project Nodes are appended to
-  * the root project node.
-  *
-  * @param parent The root Node that represents this sample code project.
-  * @param dir The current dir being processed. 
-  * @param relative Relative path for creating links to this file.
-  */
-  public void setProjectStructure(List<Node> parent, File dir, String relative) {
-    String name, link;
-    File[] dirContents = dir.listFiles();
-    Arrays.sort(dirContents, byTypeAndName);
-    for (File f: dirContents) {
-      name = f.getName();
-      if (!isValidFiletype(name)) {
-        continue;
+  public static String convertExtension(String s, String ext) {
+    return s.substring(0, s.lastIndexOf('.')) + ext;
+  }
+
+  public static String[] IMAGES = {".png", ".jpg", ".gif"};
+  public static String[] VIDEOS = {".mp4", ".ogv", ".webm"};
+  public static String[] TEMPLATED = {".java", ".xml", ".aidl", ".rs",".txt", ".TXT"};
+
+  public static boolean inList(String s, String[] list) {
+    for (String t : list) {
+      if (s.endsWith(t)) {
+        return true;
       }
-      if (f.isFile() && name.contains(".")) {
-        String path = relative + name;
-        link = convertExtension(path, Doclava.htmlExtension);
-        if (inList(path, IMAGES) || inList(path, VIDEOS) || inList(path, TEMPLATED)) {
-          parent.add(new Node.Builder().setLabel(name).setLink(ClearPage.toroot + link).build());
-        }
-      } else if (f.isDirectory()) {
-        List<Node> mchildren = new ArrayList<Node>();
-        String dirpath = relative + name + "/";
-        setProjectStructure(mchildren, f, dirpath);
-        if (mchildren.size() > 0) {
-          parent.add(new Node.Builder().setLabel(name).setLink(ClearPage.toroot 
-            + dirpath).setChildren(mchildren).build());
-        }
-      }
+    }
+    return false;
+  }
+
+  public static String mapTypes(String name) {
+    String type = name.substring(name.lastIndexOf('.') + 1, name.length());
+    if ("xml".equals(type) || "java".equals(type)) {
+      if ("AndroidManifest.xml".equals(name)) type = "manifest";
+      return type;
+    } else {
+      return type = "file";
     }
   }
 
-  /**
-  * Given a root sample code project path, iterates through the project
-  * setting page metadata to manage html output and writing/copying files to
-  * the output directory. Source files are templated and images are templated
-  * and linked to the original image.
-  *
-  * @param dir The current dir being processed.
-  * @param relative Relative path for creating links to this file.
-  * @param recursed Whether the method is being called recursively.
-  * @param hdf The data to read/write for files in this project.
-  * @param newKey Key passed in recursion for managing cs child trees.
-  */
-  public void writeProjectDirectory(File dir, String relative, Boolean recursed,
-      Data hdf, String newkey) {
+  public void writeProjectDirectory(List<Node> parent, File dir, String relative, Boolean recursed, Data hdf, String newkey) {
+    TreeSet<String> dirs = new TreeSet<String>(); //dirs for project structure and breadcrumb
+    TreeSet<String> files = new TreeSet<String>(); //files for project structure and breadcrumb
+
+    String subdir = relative;
     String name = "";
+    String label = "";
     String link = "";
     String type = "";
     int i = 0;
     String expansion = ".Sub.";
     String key = newkey;
+    double maxFileSizeBytes = 2097152; //Max size for browseable images/video
 
     if (recursed) {
       key = (key + expansion);
@@ -194,160 +132,180 @@ public class SampleCode {
     Arrays.sort(dirContents, byTypeAndName);
     for (File f: dirContents) {
       name = f.getName();
-      if (!isValidFiletype(name)) {
-        continue;
-      }
-      if (f.isFile() && name.contains(".")) {
-        String path = relative + name;
-        type = mapTypes(name);
-        link = convertExtension(path, Doclava.htmlExtension);
-        if (inList(path, IMAGES)) {
-          type = "img";
-          if (f.length() < MAX_FILE_SIZE_BYTES) {
-            ClearPage.copyFile(false, f, path);
-            writeImageVideoPage(f, convertExtension(path, Doclava.htmlExtension),
+      // don't process certain types of files
+      if (name.startsWith(".") ||
+          name.startsWith("_") ||
+          "default.properties".equals(name) ||
+          "build.properties".equals(name) ||
+          name.endsWith(".ttf") ||
+          name.endsWith(".gradle") ||
+          name.endsWith(".bat") ||
+          "Android.mk".equals(name)) {
+         //System.out.println("Invalid File Type, bypassing: " + name);
+         continue;
+       }
+       if (f.isFile() && name.contains(".")){
+         String path = relative + name;
+         type = mapTypes(name);
+         link = convertExtension(path, ".html");
+         hdf.setValue("samples", "true");//dd needed?
+         if (inList(path, IMAGES)) {
+           // copy these files to output directly
+           type = "img";
+           if (f.length() < maxFileSizeBytes) {
+             ClearPage.copyFile(false, f, path);
+             writeImageVideoPage(f, convertExtension(path, Doclava.htmlExtension),
                 relative, type, true);
-          } else {
-            writeImageVideoPage(f, convertExtension(path, Doclava.htmlExtension),
+           } else {
+             //too large for browsing, skip copying and show generic icon
+             writeImageVideoPage(f, convertExtension(path, Doclava.htmlExtension),
                 relative, type, false);
-          }
-          hdf.setValue(key + i + ".Type", "img");
-          hdf.setValue(key + i + ".Name", name);
-          hdf.setValue(key + i + ".Href", link);
-          hdf.setValue(key + i + ".RelPath", relative);
-        } else if (inList(path, VIDEOS)) {
-          type = "video";
-          if (f.length() < MAX_FILE_SIZE_BYTES) {
-            ClearPage.copyFile(false, f, path);
-            writeImageVideoPage(f, convertExtension(path, Doclava.htmlExtension),
+           }
+           files.add(name);
+           hdf.setValue(key + i + ".Type", "img");
+           hdf.setValue(key + i + ".Name", name);
+           hdf.setValue(key + i + ".Href", link);
+           hdf.setValue(key + i + ".RelPath", relative);
+         }
+         if (inList(path, VIDEOS)) {
+           // copy these files to output directly
+           type = "video";
+           if (f.length() < maxFileSizeBytes) {
+             ClearPage.copyFile(false, f, path);
+             writeImageVideoPage(f, convertExtension(path, Doclava.htmlExtension),
                 relative, type, true);
-          } else {
-            writeImageVideoPage(f, convertExtension(path, Doclava.htmlExtension),
+           } else {
+             //too large for browsing, skip copying and show generic icon
+             writeImageVideoPage(f, convertExtension(path, Doclava.htmlExtension),
                 relative, type, false);
-          }
-          hdf.setValue(key + i + ".Type", "video");
-          hdf.setValue(key + i + ".Name", name);
-          hdf.setValue(key + i + ".Href", link);
-          hdf.setValue(key + i + ".RelPath", relative);
-        } else if (inList(path, TEMPLATED)) {
-          writePage(f, convertExtension(path, Doclava.htmlExtension), relative, hdf);
-          hdf.setValue(key + i + ".Type", type);
-          hdf.setValue(key + i + ".Name", name);
-          hdf.setValue(key + i + ".Href", link);
-          hdf.setValue(key + i + ".RelPath", relative);
-        }
-        i++;
-      } else if (f.isDirectory()) {
-        List<Node> mchildren = new ArrayList<Node>();
-        type = "dir";
-        String dirpath = relative + name;
-        link = dirpath + "/index" + Doclava.htmlExtension;
+           }
+           files.add(name);
+           hdf.setValue(key + i + ".Type", "video");
+           hdf.setValue(key + i + ".Name", name);
+           hdf.setValue(key + i + ".Href", link);
+           hdf.setValue(key + i + ".RelPath", relative);
+         }
+         if (inList(path, TEMPLATED)) {
+           // copied and goes through the template
+           ClearPage.copyFile(false, f, path);
+           writePage(f, convertExtension(path, Doclava.htmlExtension), relative);
+           files.add(name);
+           hdf.setValue(key + i + ".Type", type);
+           hdf.setValue(key + i + ".Name", name);
+           hdf.setValue(key + i + ".Href", link);
+           hdf.setValue(key + i + ".RelPath", relative);
+         }
+         // add file to the navtree
+         parent.add(new Node.Builder().setLabel(name).setLink(link).setType(type).build());
+         i++;
+       } else if (f.isDirectory()) {
+         List<Node> mchildren = new ArrayList<Node>();
+         type = "dir";
+         String dirpath = relative + name;
+         link = dirpath + "/index.html";
          String hdfkeyName = (key + i + ".Name");
          String hdfkeyType = (key + i + ".Type");
          String hdfkeyHref = (key + i + ".Href");
-        hdf.setValue(hdfkeyName, name);
-        hdf.setValue(hdfkeyType, type);
-        hdf.setValue(hdfkeyHref, relative + name + "/" + "index" + Doclava.htmlExtension);
-        writeProjectDirectory(f, relative + name + "/", true, hdf, (key + i));
-        i++;
-      }
-    }
+         hdf.setValue(hdfkeyName, name);
+         hdf.setValue(hdfkeyType, type);
+         hdf.setValue(hdfkeyHref, relative + name + "/" + "index.html");
+         //System.out.println("Found directory, recursing. Current key: " + hdfkeyName);
+         writeProjectDirectory(mchildren, f, relative + name + "/", true, hdf, (key + i));
+         if (mchildren.size() > 0) {
+           //dir is processed, now add it to the navtree
+           //don't link sidenav subdirs at this point (but can use "link" to do so)
+          parent.add(new Node.Builder().setLabel(name).setChildren(mchildren).setType(type).build());
+         }
+         dirs.add(name);
+         i++;
+       }
 
+    }
+    //If this is an index for the project root (assumed root if split length is 3 (development/samples/nn)),
+    //then remove the root dir so that it won't appear in the breadcrumb. Else just pass it through to
+    //setParentDirs as usual.
+    String mpath = dir + "";
+    String sdir[] = mpath.split("/");
     setParentDirs(hdf, relative, name, false);
     //Generate an index.html page for each dir being processed
-    if (FULL_TREE_NAVIGATION) {
-      ClearPage.write(hdf, "sampleindex.cs", relative + "/index" + Doclava.htmlExtension);
-    }
+    ClearPage.write(hdf, "sampleindex.cs", relative + "/index" + Doclava.htmlExtension);
+    //concatenate dirs in the navtree. Comment out or remove to restore normal navtree
+    squashNodes(parent);
+  }
+
+  public void writeProjectStructure(String dir, Data hdf) {
+      //System.out.println(">>-- writing project structure for " + dir );
+      hdf.setValue("projectStructure", "true");
+      hdf.setValue("projectDir", mProjectDir);
+      hdf.setValue("page.title", mProjectDir + " Structure");
+      hdf.setValue("projectTitle", mTitle);
+      //write the project.html file
+      ClearPage.write(hdf, "sampleindex.cs", mDest + "project" + Doclava.htmlExtension);
+      hdf.setValue("projectStructure", "");
   }
 
   /**
   * Processes a templated project index page from _index.jd in a project root.
   * Each sample project must have an index, and each index locally defines it's own
   * page.tags and sample.group cs vars. This method takes a SC node on input, reads
-  * any local vars from the _index.jd, optionally generates an html file to out,
-  * then updates the SC node with the page vars and returns it to the caller.
+  * any local vars from the _index.jd, generates an html file to out, then updates
+  * the SC node with the page vars and returns it to the caller.
   *
-  * @param hdf The data source to read/write for this index file.
-  * @param dir The sample project root directory.
-  * @param tnode A Node to serve as the project's root node.
-  * @param writeFiles If true, generates output files only. If false, collects
-  *        metadata only.
-  * @return The tnode root with any metadata/child Nodes appended.
   */
-  public Node writeSampleIndexCs(Data hdf, File dir, Node tnode, boolean writeFiles) {
-
+  public Node writeProjectIndexCs(Data hdf, File dir, String key, Node tnode) {
+    //hdf.setValue("summary", "");
+    //hdf.setValue("summaryFlag", "");
     String filename = dir.getAbsolutePath() + "/_index.jd";
-    String mGroup = "";
     File f = new File(filename);
     String rel = dir.getPath();
-    if (writeFiles) {
+    String mGroup = "";
+    hdf.setValue("samples", "true");
+    //set any default page variables for root index
+    hdf.setValue("page.title", mProjectDir);
+    hdf.setValue("projectDir", mProjectDir);
+    hdf.setValue("projectTitle", mTitle);
+    //add the download/project links to the landing pages.
+    hdf.setValue("samplesProjectIndex", "true");
 
-      hdf.setValue("samples", "true");
-      //set any default page variables for root index
-      hdf.setValue("page.title", mProjectDir);
-      hdf.setValue("projectDir", mProjectDir);
-      hdf.setValue("projectTitle", mTitle);
-      //add the download/project links to the landing pages.
-      hdf.setValue("samplesProjectIndex", "true");
-      if (!f.isFile()) {
-        //The directory didn't have an _index.jd, so create a stub.
-        ClearPage.write(hdf, "sampleindex.cs", mDest + "index" + Doclava.htmlExtension);
-      } else {
-        DocFile.writePage(filename, rel, mDest + "index" + Doclava.htmlExtension, hdf);
-        PageMetadata.setPageMetadata(f, rel, mDest + "index" + Doclava.htmlExtension,
-            hdf, Doclava.sTaglist);
-      }
-    } else if (f.isFile()) {
-      //gather metadata for toc and jd_lists_unified
-      DocFile.getPageMetadata(filename, hdf);
+    if (!f.isFile()) {
+      //The sample didn't have any _index.jd, so create a stub.
+      ClearPage.write(hdf, "sampleindex.cs", mDest + "index" + Doclava.htmlExtension);
+      //Errors.error(Errors.INVALID_SAMPLE_INDEX, null, "Sample " + mProjectDir
+      //          + ": Root _index.jd must be present and must define sample.group"
+      //          + " tag. Please see ... for details.");
+    } else {
+      DocFile.writePage(filename, rel, mDest + "index" + Doclava.htmlExtension, hdf);
+      PageMetadata.setPageMetadata(f, rel, mDest + "index" + Doclava.htmlExtension, hdf, Doclava.sTaglist);
+      tnode.setTags(hdf.getValue("page.tags", ""));
       mGroup = hdf.getValue("sample.group", "");
-      if (!"".equals(mGroup)) {
-        tnode.setGroup(hdf.getValue("sample.group", ""));
-      } else {
+      if (mGroup.equals("")) {
         //Errors.error(Errors.INVALID_SAMPLE_INDEX, null, "Sample " + mProjectDir
         //          + ": Root _index.jd must be present and must define sample.group"
         //          + " tag. Please see ... for details.");
+      } else {
+      tnode.setGroup(hdf.getValue("sample.group", ""));
       }
     }
     return tnode;
   }
 
   /**
-  * Sets metadata for managing html output and generates the project view page
-  * for a project.
-  *
-  * @param dir The project root dir.
-  * @param hdf The data to read/write for files in this project.
-  */
-  public void writeProjectStructure(String dir, Data hdf) {
-    hdf.setValue("projectStructure", "true");
-    hdf.setValue("projectDir", mProjectDir);
-    hdf.setValue("page.title", mProjectDir + " Structure");
-    hdf.setValue("projectTitle", mTitle);
-    ClearPage.write(hdf, "sampleindex.cs", mDest + "project" + Doclava.htmlExtension);
-    hdf.setValue("projectStructure", "");
-  }
-
-  /**
-  * Keeps track of each file's parent dirs. Used for generating path breadcrumbs in html.
-  *
-  * @param dir The data to read/write for this file.
-  * @param hdf The relative path for this file, from samples root.
-  * @param subdir The relative path for this file, from samples root.
-  * @param name The name of the file (minus extension).
-  * @param isFile Whether this is a file (not a dir).
+  * Keep track of file parents
   */
   Data setParentDirs(Data hdf, String subdir, String name, Boolean isFile) {
-    if (FULL_TREE_NAVIGATION) {
-      hdf.setValue("linkfyPathCrumb", "");
-    }
+    //set whether to linkify the crumb dirs on each sample code page
+    hdf.setValue("pathCrumbLinks", "");
+        //isFile = false;
     int iter;
     hdf.removeTree("parentdirs");
     String s = subdir;
     String urlParts[] = s.split("/");
+    //int n, l = (isFile)?1:0;
     int n, l = 1;
+    //System.out.println("setParentDirs for " + subdir + name);
     for (iter=1; iter < urlParts.length; iter++) {
       n = iter-1;
+      //System.out.println("parentdirs." + n + ".Name == " + urlParts[iter]);
       hdf.setValue("parentdirs." + n + ".Name", urlParts[iter]);
       hdf.setValue("parentdirs." + n + ".Link", subdir + "index" + Doclava.htmlExtension);
     }
@@ -355,16 +313,20 @@ public class SampleCode {
   }
 
   /**
-  * Writes a templated source code file to out.
+  * Write a templated source code file to out.
   */
-  public void writePage(File f, String out, String subdir, Data hdf) {
+  public void writePage(File f, String out, String subdir) {
     String name = f.getName();
     String path = f.getPath();
-    String data = SampleTagInfo.readFile(new SourcePositionInfo(path, -1, -1), path,
-        "sample code", true, true, true, true);
+    String data =
+        SampleTagInfo.readFile(new SourcePositionInfo(path, -1, -1), path, "sample code",
+            true, true, true, true);
     data = Doclava.escape(data);
 
+    Data hdf = Doclava.makeHDF();
+
     String relative = subdir.replaceFirst("samples/", "");
+    hdf.setValue("samples", "true");
     setParentDirs(hdf, subdir, name, true);
     hdf.setValue("projectTitle", mTitle);
     hdf.setValue("projectDir", mProjectDir);
@@ -374,19 +336,17 @@ public class SampleCode {
     hdf.setValue("realFile", name);
     hdf.setValue("fileContents", data);
     hdf.setValue("resTag", "sample");
+    hdf.setValue("resType", "Sample Code");
 
     ClearPage.write(hdf, "sample.cs", out);
   }
 
   /**
-  * Writes a templated image or video file to out.
+  * Write a templated image or video file to out.
   */
   public void writeImageVideoPage(File f, String out, String subdir,
-        String resourceType, boolean browsable) {
+      String resourceType, boolean browsable) {
     Data hdf = Doclava.makeHDF();
-    hdf.setValue("samples_toc_tree", Doclava.samplesNavTree.getValue("samples_toc_tree", ""));
-    hdf.setValue("samples", "true");
-
     String name = f.getName();
     if (!browsable) {
       hdf.setValue("noDisplay", "true");
@@ -399,24 +359,16 @@ public class SampleCode {
     hdf.setValue("subdir", subdir);
     hdf.setValue("resType", resourceType);
     hdf.setValue("realFile", name);
-
     ClearPage.write(hdf, "sample.cs", out);
   }
 
   /**
-  * Given a node containing sample code projects and a node containing all valid
-  * group nodes, extract project nodes from tnode and append them to the group node
-  * that matches their sample.group metadata.
-  *
-  * @param tnode A list of nodes containing sample code projects.
-  * @param groupnodes A list of nodes that represent the valid sample groups.
-  * @return The groupnodes list with all projects appended properly to their
-  *         associated sample groups.
+  * Render a SC node tree to a navtree js file.
   */
   public static void writeSamplesNavTree(List<Node> tnode, List<Node> groupnodes) {
 
-    Node node = new Node.Builder().setLabel("Samples").setLink(ClearPage.toroot
-        + "samples/index" + Doclava.htmlExtension).setChildren(tnode).build();
+    Node node = new
+        Node.Builder().setLabel("Reference").setLink("packages.html").setChildren(tnode).build();
 
     if (groupnodes != null) {
       for (int i = 0; i < tnode.size(); i++) {
@@ -428,16 +380,25 @@ public class SampleCode {
         if (groupnodes.get(n).getChildren() == null) {
           groupnodes.remove(n);
           n--;
-        } else {
-          Collections.sort(groupnodes.get(n).getChildren(), byLabel);
         }
       }
       node.setChildren(groupnodes);
     }
 
     StringBuilder buf = new StringBuilder();
-    node.renderGroupNodesTOC(buf);
-    Doclava.samplesNavTree.setValue("samples_toc_tree", buf.toString());
+    if (false) {
+    // if you want a root node
+      buf.append("[");
+      node.render(buf);
+      buf.append("]");
+    } else {
+      // if you don't want a root node
+      node.renderChildren(buf);
+    }
+
+    Data data = Doclava.makeHDF();
+    data.setValue("reference_tree", buf.toString());
+    ClearPage.write(data, "samples_navtree_data.cs", "samples_navtree_data.js");
   }
 
   /**
@@ -463,7 +424,7 @@ public class SampleCode {
   }
 
   /**
-  * Sorts an array of files by type and name (alpha), with manifest always at top.
+  * Sort by type and name (alpha), with manifest and src always at top.
   */
   Comparator<File> byTypeAndName = new Comparator<File>() {
     public int compare (File one, File other) {
@@ -480,27 +441,22 @@ public class SampleCode {
   };
 
   /**
-  * Sorts a list of Nodes by label.
-  */
-  public static Comparator<Node> byLabel = new Comparator<Node>() {
-    public int compare(Node one, Node other) {
-      return one.getLabel().compareTo(other.getLabel());
-    }
-  };
-
-  /**
-  * Concatenates dirs that only hold dirs, to simplify nav tree
+  * Concatenate dirs that only hold dirs to simplify nav tree
   */
   public static List<Node> squashNodes(List<Node> tnode) {
     List<Node> list = tnode;
 
     for(int i = 0; i < list.size(); ++i) {
+      //only squash dirs that contain another dir whose list size is 1 and
+      //that don't contain endpoints
       if (("dir".equals(list.get(i).getType())) &&
           (list.size() == 1) &&
           (list.get(i).getChildren().get(0).getChildren() != null)) {
         String thisLabel = list.get(i).getLabel();
         String childLabel =  list.get(i).getChildren().get(0).getLabel();
         String newLabel = thisLabel + "/" + childLabel;
+        //Set label of parent and mChildren to those of child-child, skipping
+        //squashed dir
         list.get(i).setLabel(newLabel);
         list.get(i).setChildren(list.get(i).getChildren().get(0).getChildren());
       } else {
@@ -510,59 +466,6 @@ public class SampleCode {
     return list;
   }
 
-  public static String convertExtension(String s, String ext) {
-    return s.substring(0, s.lastIndexOf('.')) + ext;
-  }
-
-  /**
-  * Whitelists of valid image/video and source code types.
-  */
-  public static String[] IMAGES = {".png", ".jpg", ".gif"};
-  public static String[] VIDEOS = {".mp4", ".ogv", ".webm"};
-  public static String[] TEMPLATED = {".java", ".xml", ".aidl", ".rs",".txt", ".TXT"};
-
-  public static boolean inList(String s, String[] list) {
-    for (String t : list) {
-      if (s.endsWith(t)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  /**
-  * Maps filenames to a set of generic types. Used for displaying files/dirs
-  * in the project view page.
-  */
-  public static String mapTypes(String name) {
-    String type = name.substring(name.lastIndexOf('.') + 1, name.length());
-    if ("xml".equals(type) || "java".equals(type)) {
-      if ("AndroidManifest.xml".equals(name)) type = "manifest";
-      return type;
-    } else {
-      return type = "file";
-    }
-  }
-
-  /**
-  * Validates a source file from a project against restrictions to determine
-  * whether to include the file in the browsable project output.
-  */
-  public boolean isValidFiletype(String name) {
-    if (name.startsWith(".") ||
-        name.startsWith("_") ||
-        "default.properties".equals(name) ||
-        "build.properties".equals(name) ||
-        name.endsWith(".ttf") ||
-        name.endsWith(".gradle") ||
-        name.endsWith(".bat") ||
-        "Android.mk".equals(name)) {
-      return false;
-    } else {
-      return true;
-    }
-  }
-
   /**
   * SampleCode variant of NavTree node.
   */
@@ -570,6 +473,7 @@ public class SampleCode {
     private String mLabel;
     private String mLink;
     private String mGroup; // from sample.group in _index.jd
+    private List<String> mTags; // from page.tags in _index.jd
     private List<Node> mChildren;
     private String mType;
 
@@ -577,114 +481,150 @@ public class SampleCode {
       mLabel = builder.mLabel;
       mLink = builder.mLink;
       mGroup = builder.mGroup;
+      mTags = builder.mTags;
       mChildren = builder.mChildren;
       mType = builder.mType;
     }
 
     public static class Builder {
       private String mLabel, mLink, mGroup, mType;
+      private List<String> mTags = null;
       private List<Node> mChildren = null;
       public Builder setLabel(String mLabel) { this.mLabel = mLabel; return this;}
       public Builder setLink(String mLink) { this.mLink = mLink; return this;}
       public Builder setGroup(String mGroup) { this.mGroup = mGroup; return this;}
+      public Builder setTags(List<String> mTags) { this.mTags = mTags; return this;}
       public Builder setChildren(List<Node> mChildren) { this.mChildren = mChildren; return this;}
       public Builder setType(String mType) { this.mType = mType; return this;}
       public Node build() {return new Node(this);}
     }
 
-    /**
-    * Renders browsable sample groups and projects to an html list, starting
-    * from the group nodes and then rendering their project nodes and finally their
-    * child dirs and files. 
-    */
-    void renderGroupNodesTOC(StringBuilder buf) {
-      List<Node> list = mChildren;
-      if (list == null || list.size() == 0) {
-        return;
+    public Node(String mLabel,
+      String mLink,
+      String mGroup,
+      List<String> mTags,
+      List<Node> mChildren,
+      String mType) {
+      this.mLabel = mLabel;
+      this.mLink = mLink;
+      this.mGroup = mGroup;
+      this.mTags = mTags;
+      this.mChildren = mChildren;
+      this.mType = mType; }
+
+    static void renderString(StringBuilder buf, String s) {
+      if (s == null) {
+        buf.append("null");
       } else {
-        final int n = list.size();
-        for (int i = 0; i < n; i++) {
-          if (list.get(i).getChildren() == null) {
-            continue;
+        buf.append('"');
+        final int N = s.length();
+        for (int i = 0; i < N; i++) {
+          char c = s.charAt(i);
+          if (c >= ' ' && c <= '~' && c != '"' && c != '\\') {
+            buf.append(c);
           } else {
-            buf.append("<li class=\"nav-section\">");
-            buf.append("<div class=\"nav-section-header\">");
-            buf.append("<a href=\"" + list.get(i).getLink() + "\" title=\""
-                + list.get(i).getLabel() + "\">"
-                + list.get(i).getLabel() + "</a>");
-            buf.append("</div>");
-            buf.append("<ul>");
-            list.get(i).renderProjectNodesTOC(buf);
+            buf.append("\\u");
+            for (int j = 0; i < 4; i++) {
+              char x = (char) (c & 0x000f);
+              if (x > 10) {
+                x = (char) (x - 10 + 'a');
+              } else {
+                x = (char) (x + '0');
+              }
+              buf.append(x);
+              c >>= 4;
+            }
           }
         }
-        buf.append("</ul>");
-        buf.append("</li>");
+        buf.append('"');
       }
     }
 
-    /**
-    * Renders a list of sample code projects associated with a group node.
-    */
-    void renderProjectNodesTOC(StringBuilder buf) {
+    void renderChildren(StringBuilder buf) {
       List<Node> list = mChildren;
       if (list == null || list.size() == 0) {
-        return;
+        // We output null for no children. That way empty lists here can just
+        // be a byproduct of how we generate the lists.
+        buf.append("null");
       } else {
-        final int n = list.size();
-        for (int i = 0; i < n; i++) {
-          if (list.get(i).getChildren() == null) {
-            continue;
-          } else {
-            buf.append("<li class=\"nav-section\">");
-            buf.append("<div class=\"nav-section-header\">");
-            buf.append("<a href=\"" + list.get(i).getLink() + "\" title=\""
-                + list.get(i).getLabel() + "\">"
-                + list.get(i).getLabel() + "</a>");
-            buf.append("</div>");
-            buf.append("<ul>");
-            list.get(i).renderChildrenToc(buf);
+        buf.append("[ ");
+        final int N = list.size();
+        for (int i = 0; i < N; i++) {
+          list.get(i).render(buf);
+          if (i != N - 1) {
+            buf.append(", ");
           }
         }
-        buf.append("</ul>");
-        buf.append("</li>");
+        buf.append(" ]\n");
       }
     }
 
-    /**
-    * Renders child dirs and files associated with a project node.
-    */
-    void renderChildrenToc(StringBuilder buf) {
-      List<Node> list = mChildren;
+    void renderTags(StringBuilder buf) {
+      List<String> list = mTags;
       if (list == null || list.size() == 0) {
         buf.append("null");
       } else {
-        final int n = list.size();
-        for (int i = 0; i < n; i++) {
-          if (list.get(i).getChildren() == null) {
-            buf.append("<li>");
-            buf.append("<a href=\"" + list.get(i).getLink() + "\" title=\""
-                + list.get(i).getLabel() + "\">"
-                + list.get(i).getLabel() + "</a>");
-            buf.append("  </li>");
-          } else {
-            buf.append("<li class=\"nav-section sticky\">");
-            buf.append("<div class=\"nav-section-header empty\">");
-            buf.append("<a href=\"#\" onclick=\"return false;\" title=\""
-                + list.get(i).getLabel() + "\">"
-                + list.get(i).getLabel() + "/</a>");
-            buf.append("</div>");
-            buf.append("<ul>");
-            list.get(i).renderChildrenToc(buf);
+        buf.append("[ ");
+        final int N = list.size();
+        for (int i = 0; i < N; i++) {
+          String tagval = list.get(i).toString();
+          buf.append('"');
+          final int L = tagval.length();
+          for (int t = 0; t < L; t++) {
+            char c = tagval.charAt(t);
+            if (c >= ' ' && c <= '~' && c != '"' && c != '\\') {
+              buf.append(c);
+            } else {
+              buf.append("\\u");
+              for (int m = 0; m < 4; m++) {
+                char x = (char) (c & 0x000f);
+                if (x > 10) {
+                  x = (char) (x - 10 + 'a');
+                } else {
+                  x = (char) (x + '0');
+                }
+                buf.append(x);
+                c >>= 4;
+              }
+            } 
           }
+          buf.append('"');
+          if (i != N - 1) {
+            buf.append(", ");
+          } 
         }
-        buf.append("</ul>");
-        buf.append("</li>");
+        buf.append(" ]");
       }
     }
 
-    /**
-    * Node getters and setters
-    */
+    void render(StringBuilder buf) {
+      buf.append("[ ");
+      renderString(buf, mLabel);
+      buf.append(", ");
+      renderString(buf, mLink);
+      buf.append(", ");
+      renderString(buf, mGroup);
+      buf.append(", ");
+      renderTags(buf);
+      buf.append(", ");
+      renderChildren(buf);
+      buf.append(", ");
+      renderString(buf, mType);
+      buf.append(" ]");
+    }
+
+    public List<Node> getChildren() {
+      if (mChildren != null) {
+        return mChildren;
+      } else {
+        return null;
+      }
+    }
+
+    public void setChildren(List<Node> node) {
+        mChildren = node;
+    }
+
     public String getLabel() {
       return mLabel;
     }
@@ -693,12 +633,16 @@ public class SampleCode {
        mLabel = label;
     }
 
-    public String getLink() {
+    public String getType() {
+      return mType.toString();
+    }
+
+    public String getHref() {
       return mLink;
     }
 
-    public void setLink(String ref) {
-       mLink = ref;
+    public void setHref(String link) {
+      mLink = link;
     }
 
     public String getGroup() {
@@ -709,20 +653,157 @@ public class SampleCode {
       mGroup = group;
     }
 
-    public List<Node> getChildren() {
-        return mChildren;
+    public void setTags(String tags) {
+      List<String> tagList = new ArrayList();
+      String[] tagParts = tags.split(",");
+
+      for (int iter = 0; iter < tagParts.length; iter++) {
+        String item = tagParts[iter].replaceAll("\"", "").trim();
+        tagList.add(item);
+      }
+      mTags = tagList;
+    }
+  }
+
+  /**
+  * Write the project's templated _index.html
+  * @deprecated
+  *
+  */
+  public void writeProjectIndex(Data hdf) {
+    //System.out.println(">>-- writing project index for " + mDest );
+    hdf.setValue("projectDir", mProjectDir);
+    hdf.setValue("page.title", mProjectDir + " Sample");
+    hdf.setValue("projectTitle", mTitle);
+    ClearPage.write(hdf, "sampleindex.cs", mDest + "index" + Doclava.htmlExtension);
+  }
+
+  /**
+  * Grab the contents of an _index.html summary from a dir.
+  * @deprecated
+  */
+  public void getSummaryFromDir(Data hdf, File dir, String key) {
+    //System.out.println("Getting summary for " + dir + "/_index.html");
+    hdf.setValue("summary", "");
+    hdf.setValue("summaryFlag", "");
+    String filename = dir.getPath() + "/_index.html";
+    String summary = SampleTagInfo.readFile(new SourcePositionInfo(filename,
+                          -1,-1), filename, "sample code", true, false, false, true);
+    if (summary != null) {
+      hdf.setValue(key + "SummaryFlag", "true");
+      hdf.setValue("summary", summary);
+      //set the target for [info] link
+      //hdf.setValue(key + "Href", dir + "/index.html");
+      //return true;
+    }
+  }
+
+  /**
+  * @deprecated
+  */
+  public void writeDirectory(File dir, String relative, boolean offline) {
+    TreeSet<String> dirs = new TreeSet<String>();
+    TreeSet<String> files = new TreeSet<String>();
+
+    String subdir = relative; // .substring(mDest.length());
+
+    for (File f : dir.listFiles()) {
+      String name = f.getName();
+      if (name.startsWith(".") || name.startsWith("_")) {
+        continue;
+      }
+      if (f.isFile()) {
+        String out = relative + name;
+        if (inList(out, IMAGES)) {
+          // copied directly
+          ClearPage.copyFile(false, f, out);
+          writeImagePage(f, convertExtension(out, Doclava.htmlExtension), subdir);
+          files.add(name);
+        }
+        if (inList(out, TEMPLATED)) {
+          // copied and goes through the template
+          ClearPage.copyFile(false, f, out);
+          writePage(f, convertExtension(out, Doclava.htmlExtension), subdir);
+          files.add(name);
+
+        }
+        // else ignored
+      } else if (f.isDirectory()) {
+        writeDirectory(f, relative + name + "/", offline);
+        dirs.add(name);
+      }
     }
 
-    public void setChildren(List<Node> node) {
-        mChildren = node;
+    // write the index page
+    int i;
+
+    Data hdf = writeIndex(dir);
+    hdf.setValue("subdir", subdir);
+    i = 0;
+    for (String d : dirs) {
+      hdf.setValue("subdirs." + i + ".Name", d);
+      hdf.setValue("files." + i + ".Href", convertExtension(d, ".html"));
+      i++;
+    }
+    i = 0;
+    for (String f : files) {
+      hdf.setValue("files." + i + ".Name", f);
+      hdf.setValue("files." + i + ".Href", convertExtension(f, ".html"));
+      i++;
     }
 
-    public String getType() {
-      return mType;
-    }
+    if (!offline) relative = "/" + relative;
+    ClearPage.write(hdf, "sampleindex.cs", relative + "index" + Doclava.htmlExtension);
+  }
 
-    public void setType(String type) {
-      mType = type;
+  /**
+  * @deprecated
+  */
+  public void writeIndexOnly(File dir, String relative, Boolean offline) {
+    Data hdf = writeIndex(dir);
+    if (!offline) relative = "/" + relative;
+
+      System.out.println("writing indexonly at " + relative + "/index" + Doclava.htmlExtension);
+      ClearPage.write(hdf, "sampleindex.cs", relative + "index" + Doclava.htmlExtension);
+  }
+  
+  /**
+  * @deprecated
+  */
+  public Data writeIndex(File dir) {
+    Data hdf = Doclava.makeHDF();
+    hdf.setValue("page.title", dir.getName() + " - " + mTitle);
+    hdf.setValue("projectTitle", mTitle);
+
+    String filename = dir.getPath() + "/_index.html";
+    String summary =
+        SampleTagInfo.readFile(new SourcePositionInfo(filename, -1, -1), filename, "sample code",
+            true, false, false, true);
+
+    if (summary == null) {
+      summary = "";
     }
+    hdf.setValue("summary", summary);
+
+    return hdf;
+  }
+
+  /**
+  * @deprecated
+  */
+  public void writeImagePage(File f, String out, String subdir) {
+    Data hdf = Doclava.makeHDF();
+    String name = f.getName();
+
+    hdf.setValue("samples", "true");
+    setParentDirs(hdf, subdir, name, true);
+    hdf.setValue("page.title", name);
+    hdf.setValue("projectTitle", mTitle);
+    hdf.setValue("projectDir", mProjectDir);
+    hdf.setValue("subdir", subdir);
+    hdf.setValue("realFile", name);
+    hdf.setValue("resTag", "sample");
+    hdf.setValue("resType", "sampleImage");
+    ClearPage.write(hdf, "sample.cs", out);
   }
 }
