@@ -81,6 +81,7 @@ public class Doclava {
   public static List<PageMetadata.Node> sTaglist = new ArrayList<PageMetadata.Node>();
   public static ArrayList<SampleCode> sampleCodes = new ArrayList<SampleCode>();
   public static ArrayList<SampleCode> sampleCodeGroups = new ArrayList<SampleCode>();
+  public static Data samplesNavTree;
   public static Map<Character, String> escapeChars = new HashMap<Character, String>();
   public static String title = "";
   public static SinceTagger sinceTagger = new SinceTagger();
@@ -312,6 +313,11 @@ public class Doclava {
         TodoFile.writeTodoFile(todoFile);
       }
 
+      if (samplesRef) {
+        // always write samples without offlineMode behaviors
+        writeSamples(false, sampleCodes, SORT_BY_NAV_GROUPS);
+      }
+
       // HTML2 Pages -- Generate Pages from optional secondary dir
       if (!inputPathHtmlDir2.isEmpty()) {
         if (!outputPathHtmlDir2.isEmpty()) {
@@ -330,12 +336,6 @@ public class Doclava {
       }
 
       writeAssets();
-
-      // Sample code pages
-      if (samplesRef) {
-        // always write samples without offlineMode behaviors
-        writeSamples(false, sampleCodes, SORT_BY_NAV_GROUPS);
-      }
       
       // Navigation tree
       String refPrefix = new String();
@@ -1693,28 +1693,36 @@ public class Doclava {
   }
 
   /**
-  * Process sample projects. Generate html wrapped pages, copy files to
-  * output dir, and generate a SampleCode NavTree.
+  * Process sample projects. Generate the TOC for the samples groups and project
+  * and write it to a cs var, which is then written to files during templating to
+  * html output. Collect metadata from sample project _index.jd files. Copy html
+  * and specific source file types to the output directory.
   */
   public static void writeSamples(boolean offlineMode, ArrayList<SampleCode> sampleCodes,
       boolean sortNavByGroups) {
-    // Go through SCs processing files. Create a root list for SC nodes,
+    samplesNavTree = makeHDF();
+
+    // Go through samples processing files. Create a root list for SC nodes,
     // pass it to SCs for their NavTree children and append them.
     List<SampleCode.Node> samplesList = new ArrayList<SampleCode.Node>();
     List<SampleCode.Node> sampleGroupsRootNodes = null;
     for (SampleCode sc : sampleCodes) {
-      samplesList.add(sc.write(offlineMode));
-    }
+      samplesList.add(sc.setSamplesTOC(offlineMode));
+     }
     if (sortNavByGroups) {
       sampleGroupsRootNodes = new ArrayList<SampleCode.Node>();
       for (SampleCode gsc : sampleCodeGroups) {
-        String link =  "samples/" + gsc.mTitle.replaceAll(" ", "").trim().toLowerCase() + ".html";
+        String link =  ClearPage.toroot + "samples/" + gsc.mTitle.replaceAll(" ", "").trim().toLowerCase() + ".html";
         sampleGroupsRootNodes.add(new SampleCode.Node.Builder().setLabel(gsc.mTitle).setLink(link).setType("groupholder").build());
       }
     }
-    // Pass full samplesList to SC to render to js file
+    // Pass full samplesList to SC to render the samples TOC to sampleNavTree hdf
     if (!offlineMode) {
       SampleCode.writeSamplesNavTree(samplesList, sampleGroupsRootNodes);
+    }
+    // Iterate the samplecode projects writing the files to out
+    for (SampleCode sc : sampleCodes) {
+      sc.writeSamplesFiles(offlineMode);
     }
   }
 
