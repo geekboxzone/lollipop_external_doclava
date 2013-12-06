@@ -16,12 +16,31 @@
 
 package com.google.doclava;
 
-import com.sun.javadoc.*;
+
+import com.sun.javadoc.AnnotationDesc;
+import com.sun.javadoc.AnnotationTypeDoc;
+import com.sun.javadoc.AnnotationTypeElementDoc;
+import com.sun.javadoc.AnnotationValue;
+import com.sun.javadoc.ClassDoc;
+import com.sun.javadoc.ConstructorDoc;
+import com.sun.javadoc.ExecutableMemberDoc;
+import com.sun.javadoc.FieldDoc;
+import com.sun.javadoc.MemberDoc;
+import com.sun.javadoc.MethodDoc;
+import com.sun.javadoc.PackageDoc;
+import com.sun.javadoc.ParamTag;
+import com.sun.javadoc.Parameter;
+import com.sun.javadoc.RootDoc;
+import com.sun.javadoc.SeeTag;
+import com.sun.javadoc.SourcePosition;
+import com.sun.javadoc.Tag;
+import com.sun.javadoc.ThrowsTag;
+import com.sun.javadoc.Type;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.ArrayList;
 
 public class Converter {
   private static RootDoc root;
@@ -29,15 +48,15 @@ public class Converter {
   public static void makeInfo(RootDoc r) {
     root = r;
 
-    int N, i;
-
     // create the objects
-    ClassDoc[] classDocs = r.classes();
-    N = classDocs.length;
-    for (i = 0; i < N; i++) {
-      Converter.obtainClass(classDocs[i]);
+    ClassDoc[] classes = getClasses(r);
+    for (ClassDoc c : classes) {
+      Converter.obtainClass(c);
     }
+
     ArrayList<ClassInfo> classesNeedingInit2 = new ArrayList<ClassInfo>();
+
+    int i;
     // fill in the fields that reference other classes
     while (mClassesNeedingInit.size() > 0) {
       i = mClassesNeedingInit.size() - 1;
@@ -55,7 +74,26 @@ public class Converter {
     finishAnnotationValueInit();
 
     // fill in the "root" stuff
-    mRootClasses = Converter.convertClasses(r.classes());
+    mRootClasses = Converter.convertClasses(classes);
+  }
+
+  private static ClassDoc[] getClasses(RootDoc r) {
+    ClassDoc[] classDocs = r.classes();
+    ArrayList<ClassDoc> filtered = new ArrayList<ClassDoc>(classDocs.length);
+    for (ClassDoc c : classDocs) {
+      if (c.position() != null) {
+        // Work around a javadoc bug in Java 7: We sometimes spuriously
+        // receive duplicate top level ClassDocs with null positions and no type
+        // information. Ignore them, since every ClassDoc must have a non null
+        // position.
+
+        filtered.add(c);
+      }
+    }
+
+    ClassDoc[] filteredArray = new ClassDoc[filtered.size()];
+    filtered.toArray(filteredArray);
+    return filteredArray;
   }
 
   private static ClassInfo[] mRootClasses;
