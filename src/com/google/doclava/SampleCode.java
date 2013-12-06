@@ -85,6 +85,7 @@ public class SampleCode {
   }
 
   public static String[] IMAGES = {".png", ".jpg", ".gif"};
+  public static String[] VIDEOS = {".mp4", ".ogv", ".webm"};
   public static String[] TEMPLATED = {".java", ".xml", ".aidl", ".rs",".txt", ".TXT"};
 
   public static boolean inList(String s, String[] list) {
@@ -118,6 +119,7 @@ public class SampleCode {
     int i = 0;
     String expansion = ".Sub.";
     String key = newkey;
+    double maxFileSizeBytes = 2097152; //Max size for browseable images/video
 
     if (recursed) {
       key = (key + expansion);
@@ -149,10 +151,35 @@ public class SampleCode {
          if (inList(path, IMAGES)) {
            // copy these files to output directly
            type = "img";
-           ClearPage.copyFile(false, f, path);
-           writeImagePage(f, convertExtension(path, Doclava.htmlExtension), relative);
+           if (f.length() < maxFileSizeBytes) {
+             ClearPage.copyFile(false, f, path);
+             writeImageVideoPage(f, convertExtension(path, Doclava.htmlExtension),
+                relative, type, true);
+           } else {
+             //too large for browsing, skip copying and show generic icon
+             writeImageVideoPage(f, convertExtension(path, Doclava.htmlExtension),
+                relative, type, false);
+           }
            files.add(name);
            hdf.setValue(key + i + ".Type", "img");
+           hdf.setValue(key + i + ".Name", name);
+           hdf.setValue(key + i + ".Href", link);
+           hdf.setValue(key + i + ".RelPath", relative);
+         }
+         if (inList(path, VIDEOS)) {
+           // copy these files to output directly
+           type = "video";
+           if (f.length() < maxFileSizeBytes) {
+             ClearPage.copyFile(false, f, path);
+             writeImageVideoPage(f, convertExtension(path, Doclava.htmlExtension),
+                relative, type, true);
+           } else {
+             //too large for browsing, skip copying and show generic icon
+             writeImageVideoPage(f, convertExtension(path, Doclava.htmlExtension),
+                relative, type, false);
+           }
+           files.add(name);
+           hdf.setValue(key + i + ".Type", "video");
            hdf.setValue(key + i + ".Name", name);
            hdf.setValue(key + i + ".Href", link);
            hdf.setValue(key + i + ".RelPath", relative);
@@ -193,18 +220,11 @@ public class SampleCode {
        }
 
     }
-    //dd not working yet
-    //Get summary from any _index files in any project dirs (currently disabled)
-    //  getSummaryFromDir(hdf, dir, newkey);
     //If this is an index for the project root (assumed root if split length is 3 (development/samples/nn)),
     //then remove the root dir so that it won't appear in the breadcrumb. Else just pass it through to
     //setParentDirs as usual.
     String mpath = dir + "";
     String sdir[] = mpath.split("/");
-    if (sdir.length == 3 ) {
-      System.out.println("-----------------> this must be the root: [sdir len]" + sdir.length + "[dir]" + dir);
-      hdf.setValue("showProjectPaths","true");//dd remove here?
-    }
     setParentDirs(hdf, relative, name, false);
     //Generate an index.html page for each dir being processed
     ClearPage.write(hdf, "sampleindex.cs", relative + "/index" + Doclava.htmlExtension);
@@ -243,6 +263,8 @@ public class SampleCode {
     hdf.setValue("page.title", mProjectDir);
     hdf.setValue("projectDir", mProjectDir);
     hdf.setValue("projectTitle", mTitle);
+    //add the download/project links to the landing pages.
+    hdf.setValue("samplesProjectIndex", "true");
 
     if (!f.isFile()) {
       //The sample didn't have any _index.jd, so create a stub.
@@ -318,24 +340,23 @@ public class SampleCode {
   }
 
   /**
-  * Write a templated image file to out.
+  * Write a templated image or video file to out.
   */
-  public void writeImagePage(File f, String out, String subdir) {
-    String name = f.getName();
-
-    String data = "<img src=\"" + name + "\" title=\"" + name + "\" />";
-
+  public void writeImageVideoPage(File f, String out, String subdir,
+      String resourceType, boolean browsable) {
     Data hdf = Doclava.makeHDF();
-    hdf.setValue("samples", "true");
+    String name = f.getName();
+    if (!browsable) {
+      hdf.setValue("noDisplay", "true");
+    }
     setParentDirs(hdf, subdir, name, true);
+    hdf.setValue("samples", "true");
     hdf.setValue("page.title", name);
     hdf.setValue("projectTitle", mTitle);
     hdf.setValue("projectDir", mProjectDir);
     hdf.setValue("subdir", subdir);
+    hdf.setValue("resType", resourceType);
     hdf.setValue("realFile", name);
-    hdf.setValue("fileContents", data);
-    hdf.setValue("resTag", "sample");
-    hdf.setValue("resType", "Sample Code");
     ClearPage.write(hdf, "sample.cs", out);
   }
 
@@ -407,8 +428,6 @@ public class SampleCode {
       } else if (!one.isDirectory() && other.isDirectory()) {
         return -1;
       } else if (one.getName().equals("AndroidManifest.xml")) {
-        return -1;
-      } else if (one.getName().equals("src")) {
         return -1;
       } else {
         return one.compareTo(other);
@@ -738,4 +757,22 @@ public class SampleCode {
     return hdf;
   }
 
+  /**
+  * @deprecated
+  */
+  public void writeImagePage(File f, String out, String subdir) {
+    Data hdf = Doclava.makeHDF();
+    String name = f.getName();
+
+    hdf.setValue("samples", "true");
+    setParentDirs(hdf, subdir, name, true);
+    hdf.setValue("page.title", name);
+    hdf.setValue("projectTitle", mTitle);
+    hdf.setValue("projectDir", mProjectDir);
+    hdf.setValue("subdir", subdir);
+    hdf.setValue("realFile", name);
+    hdf.setValue("resTag", "sample");
+    hdf.setValue("resType", "sampleImage");
+    ClearPage.write(hdf, "sample.cs", out);
+  }
 }
