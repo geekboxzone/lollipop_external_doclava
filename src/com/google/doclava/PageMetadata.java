@@ -430,7 +430,7 @@ public class PageMetadata {
     void renderTagIndices(StringBuilder buf, List<Node> tagList) {
       List<Node> list = tagList;
       if (list == null || list.size() == 0) {
-        buf.append("null");
+        buf.append("");
       } else {
         final int n = list.size();
         for (int i = 0; i < n; i++) {
