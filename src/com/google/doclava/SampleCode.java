@@ -296,8 +296,6 @@ public class SampleCode {
         ClearPage.write(hdf, "sampleindex.cs", mDest + "index" + Doclava.htmlExtension);
       } else {
         DocFile.writePage(filename, rel, mDest + "index" + Doclava.htmlExtension, hdf);
-        PageMetadata.setPageMetadata(f, rel, mDest + "index" + Doclava.htmlExtension,
-            hdf, Doclava.sTaglist);
       }
     } else if (f.isFile()) {
       //gather metadata for toc and jd_lists_unified
