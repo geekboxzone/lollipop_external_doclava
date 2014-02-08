@@ -16,6 +16,8 @@
 
 package com.google.doclava;
 
+import java.io.*;
+import java.text.BreakIterator;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -25,6 +27,24 @@ import java.util.regex.Matcher;
 import java.io.File;
 
 import com.google.clearsilver.jsilver.data.Data;
+
+import org.ccil.cowan.tagsoup.*;
+import org.xml.sax.XMLReader;
+import org.xml.sax.InputSource;
+import org.xml.sax.Attributes;
+import org.xml.sax.helpers.DefaultHandler;
+
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+
+import javax.xml.transform.dom.DOMResult;
+import javax.xml.transform.sax.SAXSource;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.xpath.XPath;
+import javax.xml.xpath.XPathConstants;
+import javax.xml.xpath.XPathExpression;
+import javax.xml.xpath.XPathFactory;
 
 /**
 * Metadata associated with a specific documentation page. Extracts
@@ -43,6 +63,13 @@ public class PageMetadata {
   String mTagList;
   static boolean sLowercaseTags = true;
   static boolean sLowercaseKeywords = true;
+  //static String linkPrefix = (Doclava.META_DBG) ? "/" : "http://developer.android.com/";
+  /**
+   * regex pattern to match javadoc @link and similar tags. Extracts
+   * root symbol to $1.
+   */
+  private static final Pattern JD_TAG_PATTERN =
+      Pattern.compile("\\{@.*?[\\s\\.\\#]([A-Za-z\\(\\)\\d_]+)(?=\u007D)\u007D");
 
   public PageMetadata(File source, String dest, List<Node> taglist) {
     mSource = source;
@@ -87,32 +114,152 @@ public class PageMetadata {
   * are normalized. Unsupported metadata fields are ignored. See
   * Node for supported metadata fields and methods for accessing values.
   *
-  * @param file The file from which to extract metadata.
+  * @param docfile The file from which to extract metadata.
   * @param dest The output path for the file, used to set link to page.
   * @param filename The file from which to extract metadata.
   * @param hdf Data object in which to store the metadata values.
   * @param tagList The file from which to extract metadata.
-  * @return tagList with new node added.
   */
-  public static List<Node> setPageMetadata(File file, String dest, String filename,
+  public static void setPageMetadata(String docfile, String dest, String filename,
       Data hdf, List<Node> tagList) {
     //exclude this page if author does not want it included
     boolean excludeNode = "true".equals(hdf.getValue("excludeFromSuggestions",""));
+
+    //check whether summary and image exist and if not, get them from itemprop/markup
+    Boolean needsSummary = "".equals(hdf.getValue("page.metaDescription", ""));
+    Boolean needsImage = "".equals(hdf.getValue("page.image", ""));
+    if ((needsSummary) || (needsImage)) {
+      //try to extract the metadata from itemprop and markup
+      inferMetadata(docfile, hdf, needsSummary, needsImage);
+    }
+
+    //extract available metadata and set it in a node
     if (!excludeNode) {
       Node pageMeta = new Node.Builder().build();
       pageMeta.setLabel(getTitleNormalized(hdf, "page.title"));
       pageMeta.setTitleFriendly(hdf.getValue("page.titleFriendly",""));
-      pageMeta.setSummary(hdf.getValue("page.summary",""));
-      pageMeta.setLink(filename);
+      pageMeta.setSummary(hdf.getValue("page.metaDescription",""));
+      pageMeta.setLink(getPageUrlNormalized(filename));
       pageMeta.setGroup(getStringValueNormalized(hdf,"sample.group"));
       pageMeta.setKeywords(getPageTagsNormalized(hdf, "page.tags"));
       pageMeta.setTags(getPageTagsNormalized(hdf, "meta.tags"));
-      pageMeta.setImage(getStringValueNormalized(hdf, "page.image"));
+      pageMeta.setImage(getImageUrlNormalized(hdf.getValue("page.image", "")));
       pageMeta.setLang(getLangStringNormalized(filename));
       pageMeta.setType(getStringValueNormalized(hdf, "page.type"));
       appendMetaNodeByType(pageMeta, tagList);
     }
-    return tagList;
+  }
+
+  /**
+  * Attempt to infer page metadata based on the contents of the
+  * file. Load and parse the file as a dom tree. Select values
+  * in this order: 1. dom node specifically tagged with
+  * microdata (itemprop). 2. first qualitifed p or img node.
+  *
+  * @param docfile The file from which to extract metadata.
+  * @param hdf Data object in which to store the metadata values.
+  * @param needsSummary Whether to extract summary metadata.
+  * @param needsImage Whether to extract image metadata.
+  */
+  public static void inferMetadata(String docfile, Data hdf,
+      Boolean needsSummary, Boolean needsImage) {
+    String sum = "";
+    String imageUrl = "";
+    String sumFrom = needsSummary ? "none" : "hdf";
+    String imgFrom = needsImage ? "none" : "hdf";
+    String filedata = hdf.getValue("commentText", "");
+    if (Doclava.META_DBG) System.out.println("----- " + docfile + "\n");
+
+    try {
+      XPathFactory xpathFac = XPathFactory.newInstance();
+      XPath xpath = xpathFac.newXPath();
+      InputStream inputStream = new ByteArrayInputStream(filedata.getBytes());
+      XMLReader reader = new Parser();
+      reader.setFeature(Parser.namespacesFeature, false);
+      reader.setFeature(Parser.namespacePrefixesFeature, false);
+      reader.setFeature(Parser.ignoreBogonsFeature, true);
+
+      Transformer transformer = TransformerFactory.newInstance().newTransformer();
+      DOMResult result = new DOMResult();
+      transformer.transform(new SAXSource(reader, new InputSource(inputStream)), result);
+      org.w3c.dom.Node htmlNode = result.getNode();
+
+      if (needsSummary) {
+        StringBuilder sumStrings = new StringBuilder();
+        XPathExpression ItempropDescExpr = xpath.compile("/descendant-or-self::*"
+            + "[@itemprop='description'][1]//text()[string(.)]");
+        org.w3c.dom.NodeList nodes = (org.w3c.dom.NodeList) ItempropDescExpr.evaluate(htmlNode,
+            XPathConstants.NODESET);
+        if (nodes.getLength() > 0) {
+          for (int i = 0; i < nodes.getLength(); i++) {
+            String tx = nodes.item(i).getNodeValue();
+            sumStrings.append(tx);
+            sumFrom = "itemprop";
+          }
+        } else {
+          XPathExpression FirstParaExpr = xpath.compile("//p[not(../../../"
+              + "@class='notice-developers') and not(../@class='sidebox')"
+              + "and not(@class)]//text()");
+          nodes = (org.w3c.dom.NodeList) FirstParaExpr.evaluate(htmlNode, XPathConstants.NODESET);
+          if (nodes.getLength() > 0) {
+            for (int i = 0; i < nodes.getLength(); i++) {
+              String tx = nodes.item(i).getNodeValue();
+              sumStrings.append(tx + " ");
+              sumFrom = "markup";
+            }
+          }
+        }
+        //found a summary string, now normalize it
+        sum = sumStrings.toString().trim();
+        if ((sum != null) && (!"".equals(sum))) {
+          sum = getSummaryNormalized(sum);
+        }
+        //normalized summary ended up being too short to be meaningful
+        if ("".equals(sum)) {
+           if (Doclava.META_DBG) System.out.println("Warning: description too short! ("
+            + sum.length() + "chars) ...\n\n");
+        }
+        //summary looks good, store it to the file hdf data
+        hdf.setValue("page.metaDescription", sum);
+      }
+      if (needsImage) {
+        XPathExpression ItempropImageExpr = xpath.compile("//*[@itemprop='image']/@src");
+        org.w3c.dom.NodeList imgNodes = (org.w3c.dom.NodeList) ItempropImageExpr.evaluate(htmlNode,
+            XPathConstants.NODESET);
+        if (imgNodes.getLength() > 0) {
+          imageUrl = imgNodes.item(0).getNodeValue();
+          imgFrom = "itemprop";
+        } else {
+          XPathExpression FirstImgExpr = xpath.compile("//img/@src");
+          imgNodes = (org.w3c.dom.NodeList) FirstImgExpr.evaluate(htmlNode, XPathConstants.NODESET);
+          if (imgNodes.getLength() > 0) {
+            //iterate nodes looking for valid image url and normalize.
+            for (int i = 0; i < imgNodes.getLength(); i++) {
+              String tx = imgNodes.item(i).getNodeValue();
+              //qualify and normalize the image
+              imageUrl = getImageUrlNormalized(tx);
+              //this img src did not qualify, keep looking...
+              if ("".equals(imageUrl)) {
+                if (Doclava.META_DBG) System.out.println("    >>>>> Discarded image: " + tx);
+                continue;
+              } else {
+                imgFrom = "markup";
+                break;
+              }
+            }
+          }
+        }
+        //img src url looks good, store it to the file hdf data
+        hdf.setValue("page.image", imageUrl);
+      }
+      if (Doclava.META_DBG) System.out.println("Image (" + imgFrom + "): " + imageUrl);
+      if (Doclava.META_DBG) System.out.println("Summary (" + sumFrom + "): " + sum.length()
+          + " chars\n\n" + sum + "\n");
+      return;
+
+    } catch (Exception e) {
+      if (Doclava.META_DBG) System.out.println("    >>>>> Exception: " + e + "\n");
+    }
   }
 
   /**
@@ -126,24 +273,37 @@ public class PageMetadata {
   */
   public static String getPageTagsNormalized(Data hdf, String tag) {
 
+    String normTags = "";
     StringBuilder tags = new StringBuilder();
     String tagList = hdf.getValue(tag, "");
+    if (tag.equals("meta.tags") && (tagList.equals(""))) {
+      //use keywords as tags if no meta tags are available
+      tagList = hdf.getValue("page.tags", "");
+    }
     if (!tagList.equals("")) {
       tagList = tagList.replaceAll("\"", "");
       String[] tagParts = tagList.split(",");
       for (int iter = 0; iter < tagParts.length; iter++) {
-        tags.append("'");
+        tags.append("\"");
         if (tag.equals("meta.tags") && sLowercaseTags) {
           tagParts[iter] = tagParts[iter].toLowerCase();
         } else if (tag.equals("page.tags") && sLowercaseKeywords) {
           tagParts[iter] = tagParts[iter].toLowerCase();
         }
+        if (tag.equals("meta.tags")) {
+          //tags.append("#"); //to match hashtag format used with yt/blogger resources
+          tagParts[iter] = tagParts[iter].replaceAll(" ","");
+        }
         tags.append(tagParts[iter].trim());
-        tags.append("'");
+        tags.append("\"");
         if (iter < tagParts.length - 1) {
           tags.append(",");
         }
       }
+    }
+    //write this back to hdf to expose through js
+    if (tag.equals("meta.tags")) {
+      hdf.setValue(tag, tags.toString());
     }
     return tags.toString();
   }
@@ -161,8 +321,8 @@ public class PageMetadata {
   public static String getStringValueNormalized(Data hdf, String tag) {
     StringBuilder outString =  new StringBuilder();
     String tagList = hdf.getValue(tag, "");
+    tagList.replaceAll("\"", "");
     if (!tagList.isEmpty()) {
-      tagList.replaceAll("\"", "");
       int end = tagList.indexOf(",");
       if (end != -1) {
         tagList = tagList.substring(0,end);
@@ -188,7 +348,7 @@ public class PageMetadata {
     StringBuilder outTitle =  new StringBuilder();
     String title = hdf.getValue(tag, "");
     if (!title.isEmpty()) {
-      title = title.replaceAll("\"", "'");
+      title = escapeString(title);
       if (title.indexOf("<span") != -1) {
         String[] splitTitle = title.split("<span(.*?)</span>");
         title = splitTitle[0];
@@ -223,6 +383,99 @@ public class PageMetadata {
       }
     }
     return outFrag;
+  }
+
+  /**
+  * Normalize a page summary string and truncate as needed. Strings
+  * exceeding max_chars are truncated at the first word boundary
+  * following the max_size marker. Strings smaller than min_chars
+  * are discarded (as they are assumed to be too little context).
+  *
+  * @param s String extracted from the page as it's summary.
+  * @return A normalized string value.
+  */
+  public static String getSummaryNormalized(String s) {
+    String str = "";
+    int max_chars = 250;
+    int min_chars = 50;
+    int marker = 0;
+    if (s.length() < min_chars) {
+      return str;
+    } else {
+      str = s.replaceAll("^\"|\"$", "");
+      str = str.replaceAll("\\s+", " ");
+      str = JD_TAG_PATTERN.matcher(str).replaceAll("$1");
+      str = escapeString(str);
+      BreakIterator bi = BreakIterator.getWordInstance();
+      bi.setText(str);
+      if (str.length() > max_chars) {
+        marker = bi.following(max_chars);
+      } else {
+        marker = bi.last();
+      }
+      str = str.substring(0, marker);
+      str = str.concat("\u2026" );
+    }
+    return str;
+  }
+
+  public static String escapeString(String s) {
+    s = s.replaceAll("\"", "&quot;");
+    s = s.replaceAll("\'", "&#39;");
+    s = s.replaceAll("<", "&lt;");
+    s = s.replaceAll(">", "&gt;");
+    s = s.replaceAll("/", "&#47;");
+    return s;
+  }
+
+  //Disqualify img src urls that include these substrings
+  public static String[] IMAGE_EXCLUDE = {"/triangle-", "favicon","android-logo",
+      "icon_play.png", "robot-tiny"};
+
+  public static boolean inList(String s, String[] list) {
+    for (String t : list) {
+      if (s.contains(t)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+  * Normalize an img src url by removing docRoot and leading
+  * slash for local image references. These are added later
+  * in js to support offline mode and keep path reference
+  * format consistent with hrefs.
+  *
+  * @param url Abs or rel url sourced from img src.
+  * @return Normalized url if qualified, else empty
+  */
+  public static String getImageUrlNormalized(String url) {
+    String absUrl = "";
+    // validate to avoid choosing using specific images
+    if ((url != null) && (!url.equals("")) && (!inList(url, IMAGE_EXCLUDE))) {
+      absUrl = url.replace("{@docRoot}", "");
+      absUrl = absUrl.replaceFirst("^/(?!/)", "");
+    }
+    return absUrl;
+  }
+
+  /**
+  * Normalize an href url by removing docRoot and leading
+  * slash for local image references. These are added later
+  * in js to support offline mode and keep path reference
+  * format consistent with hrefs.
+  *
+  * @param url Abs or rel page url sourced from href
+  * @return Normalized url, either abs or rel to root
+  */
+  public static String getPageUrlNormalized(String url) {
+    String absUrl = "";
+    if ((url !=null) && (!url.equals(""))) {
+      absUrl = url.replace("{@docRoot}", "");
+      absUrl = absUrl.replaceFirst("^/(?!/)", "");
+    }
+    return absUrl;
   }
 
   /**
@@ -272,6 +525,7 @@ public class PageMetadata {
         for (String t : nodeTags) { //process each of the meta.tags
           for (Node n : rootTagNodesList) {
             if (n.getLabel().equals(t.toString())) {
+              n.getTags().add(String.valueOf(iter));
               matched = true;
               break; // add to the first root node only
             } // tag did not match
@@ -383,16 +637,16 @@ public class PageMetadata {
         final int n = list.size();
         for (int i = 0; i < n; i++) {
           buf.append("\n      {\n");
-          buf.append("        title:\"" + list.get(i).mLabel + "\",\n" );
-          buf.append("        titleFriendly:\"" + list.get(i).mTitleFriendly + "\",\n" );
-          buf.append("        summary:\"" + list.get(i).mSummary + "\",\n" );
-          buf.append("        url:\"" + list.get(i).mLink + "\",\n" );
-          buf.append("        group:\"" + list.get(i).mGroup + "\",\n" );
+          buf.append("        \"title\":\"" + list.get(i).mLabel + "\",\n" );
+          buf.append("        \"titleFriendly\":\"" + list.get(i).mTitleFriendly + "\",\n" );
+          buf.append("        \"summary\":\"" + list.get(i).mSummary + "\",\n" );
+          buf.append("        \"url\":\"" + list.get(i).mLink + "\",\n" );
+          buf.append("        \"group\":\"" + list.get(i).mGroup + "\",\n" );
           list.get(i).renderArrayType(buf, list.get(i).mKeywords, "keywords");
           list.get(i).renderArrayType(buf, list.get(i).mTags, "tags");
-          buf.append("        image:\"" + list.get(i).mImage + "\",\n" );
-          buf.append("        lang:\"" + list.get(i).mLang + "\",\n" );
-          buf.append("        type:\"" + list.get(i).mType + "\"");
+          buf.append("        \"image\":\"" + list.get(i).mImage + "\",\n" );
+          buf.append("        \"lang\":\"" + list.get(i).mLang + "\",\n" );
+          buf.append("        \"type\":\"" + list.get(i).mType + "\"");
           buf.append("\n      }");
           if (i != n - 1) {
             buf.append(", ");
@@ -434,7 +688,6 @@ public class PageMetadata {
       } else {
         final int n = list.size();
         for (int i = 0; i < n; i++) {
-
           buf.append("\n    " + list.get(i).mLabel + ":[");
           renderArrayValue(buf, list.get(i).mTags);
           buf.append("]");
@@ -452,7 +705,7 @@ public class PageMetadata {
     * @param key The key for the pair.
     */
     void renderArrayType(StringBuilder buf, List<String> type, String key) {
-      buf.append("        " + key + ": [");
+      buf.append("        \"" + key + "\": [");
       renderArrayValue(buf, type);
       buf.append("],\n");
     }
