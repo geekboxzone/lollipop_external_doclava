@@ -42,11 +42,25 @@ public abstract class MemberInfo extends DocInfo implements Comparable, Scoped {
 
   public abstract boolean isExecutable();
 
+  private boolean hasHiddenComment() {
+    PackageInfo pkg = containingClass().containingPackage();
+    boolean pkgHidden = pkg != null ? pkg.hasHideComment() : false;
+    boolean classHidden = containingClass().hasHideComment();
+    boolean memberHidden = comment().isHidden();
+
+    return pkgHidden || classHidden || memberHidden;
+  }
+
   @Override
   public boolean isHidden() {
     if (mAnnotations != null) {
       for (AnnotationInstanceInfo info : mAnnotations) {
         if (Doclava.showAnnotations.contains(info.type().qualifiedName())) {
+          if (!hasHiddenComment()) {
+            Errors.error(Errors.SHOW_ANNOTATION_NOT_HIDDEN, position(), "Member "
+                + mContainingClass.qualifiedName() + "." + name()
+                + " shown by annotation but not @hidden.");
+          }
           return false;
         }
       }

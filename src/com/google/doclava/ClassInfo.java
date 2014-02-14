@@ -1362,10 +1362,16 @@ public class ClassInfo extends DocInfo implements ContainerInfo, Comparable, Sco
   public boolean isHiddenImpl() {
     ClassInfo cl = this;
     while (cl != null) {
-      if (cl.hasShowAnnotation()) {
-        return false;
-      }
       PackageInfo pkg = cl.containingPackage();
+      if (cl.hasShowAnnotation()) {
+        if ((pkg != null && pkg.hasHideComment()) || cl.hasHideComment()) {
+            return false;
+        } else {
+            Errors.error(Errors.SHOW_ANNOTATION_NOT_HIDDEN, position(), "Class "
+                + cl.qualifiedName() + " shown by annotation but not hidden.");
+            return false;
+        }
+      }
       if (pkg != null && pkg.hasHideComment()) {
         return true;
       }
@@ -1411,6 +1417,24 @@ public class ClassInfo extends DocInfo implements ContainerInfo, Comparable, Sco
   @Override
   public boolean isHiddenOrRemoved() {
     return isHidden() || isRemoved();
+  }
+
+  /**
+   * Used by ClassInfo to determine packages default visability before annoations.
+   */
+  public boolean hasHideComment() {
+    if (mHiddenByComment == -1) {
+      ClassInfo cl = this;
+      while (cl != null) {
+        if (cl.comment().isHidden()) {
+          mHiddenByComment = 1;
+          return true;
+        }
+        cl = cl.containingClass();
+      }
+      mHiddenByComment = 0;
+    }
+    return mHiddenByComment != 0;
   }
 
   public boolean hasShowAnnotation() {
@@ -1702,6 +1726,9 @@ public class ClassInfo extends DocInfo implements ContainerInfo, Comparable, Sco
   private Boolean mHidden = null;
   private Boolean mRemoved = null;
   private Boolean mCheckLevel = null;
+  private int mHidden = -1;
+  private int mHiddenByComment = -1;
+  private int mCheckLevel = -1;
   private String mReasonIncluded;
   private ArrayList<MethodInfo> mNonWrittenConstructors;
   private boolean mIsDeprecated;
