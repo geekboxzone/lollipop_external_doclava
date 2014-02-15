@@ -92,6 +92,9 @@ public class Doclava {
   public static Set<String> showAnnotations = new HashSet<String>();
   public static boolean includeDefaultAssets = true;
   private static boolean generateDocs = true;
+  //build sdk docs without reference or browsable samples (use -briefdocs)
+  private static boolean brief_docs = false;
+
   private static boolean parseComments = false;
   private static String yamlNavFile = null;
 
@@ -267,6 +270,11 @@ public class Doclava {
         // Don't copy the doclava assets to devsite output (ie use proj assets only)
         includeDefaultAssets = false;
         outputPathHtmlDirs = outputPathHtmlDirs + "/" + devsiteRoot;
+      } else if (a[0].equals("-briefdocs")) {
+        // Don't generate reference docs or browsable sample code
+        // pages when building the docs. Javadoc links in input
+        // files are still resolved.
+        brief_docs = true;
       }
     }
 
@@ -301,28 +309,38 @@ public class Doclava {
         return false;
       }
 
-      //startTime = System.nanoTime();
+      if (!brief_docs) {
+        long taggingStartTime = System.nanoTime();
+        // Apply @since tags from the XML file
+        sinceTagger.tagAll(Converter.rootClasses());
 
-      // Apply @since tags from the XML file
-      sinceTagger.tagAll(Converter.rootClasses());
+        // Apply details of federated documentation
+        federationTagger.tagAll(Converter.rootClasses());
 
-      // Apply details of federated documentation
-      federationTagger.tagAll(Converter.rootClasses());
-
-      // Files for proofreading
-      if (proofreadFile != null) {
-        Proofread.initProofread(proofreadFile);
+        // Files for proofreading
+        if (proofreadFile != null) {
+          Proofread.initProofread(proofreadFile);
+        }
+        if (todoFile != null) {
+          TodoFile.writeTodoFile(todoFile);
+        }
+        long taggingTime = System.nanoTime() - taggingStartTime;
+        System.out.println("  ... @since tagging APIs: "
+            + (taggingTime / 1000000000) + " sec.");
       }
-      if (todoFile != null) {
-        TodoFile.writeTodoFile(todoFile);
-      }
 
-  if (samplesRef) {
+      if ((samplesRef) && (!brief_docs)) {
+        long samplesStartTime = System.nanoTime();
         // always write samples without offlineMode behaviors
-  writeSamples(false, sampleCodes, SORT_BY_NAV_GROUPS);
-  }
+        writeSamples(false, sampleCodes, SORT_BY_NAV_GROUPS);
+        long samplesTime = System.nanoTime() - samplesStartTime;
+        System.out.println("  ... Writing browseable samples: "
+            + (samplesTime / 1000000000) + " sec.");
+      }
 
+      long htmlStartTime = System.nanoTime();
       // HTML2 Pages -- Generate Pages from optional secondary dir
+
       if (!inputPathHtmlDir2.isEmpty()) {
         if (!outputPathHtmlDir2.isEmpty()) {
           ClearPage.outputDir = outputPathBase + "/" + outputPathHtmlDir2;
@@ -338,6 +356,9 @@ public class Doclava {
         ClearPage.outputDir = outputPathHtmlDirs;
         writeHTMLPages();
       }
+      long htmlTime = System.nanoTime() - htmlStartTime;
+      System.out.println("  ... Writing static html: "
+          + (htmlTime / 1000000000) + " sec.");
 
       writeAssets();
       
@@ -350,43 +371,53 @@ public class Doclava {
       }
       NavTree.writeNavTree(javadocDir, refPrefix);
 
-      // Write yaml tree.
-      if (yamlNavFile != null){
-        NavTree.writeYamlTree(javadocDir, yamlNavFile);
+      if (!brief_docs) {
+        // Write yaml tree.
+        if (yamlNavFile != null){
+          NavTree.writeYamlTree(javadocDir, yamlNavFile);
+        }
+
+        long refStartTime = System.nanoTime();
+        // Packages Pages
+
+        writePackages(javadocDir + refPrefix + "packages" + htmlExtension);
+
+        // Classes
+        writeClassLists();
+        writeClasses();
+        writeHierarchy();
+        // writeKeywords();
+
+        // Lists for JavaScript
+        writeLists();
+        if (keepListFile != null) {
+          writeKeepList(keepListFile);
+        }
+
+        // Index page
+        writeIndex();
+
+        Proofread.finishProofread(proofreadFile);
+
+        if (sdkValuePath != null) {
+          writeSdkValues(sdkValuePath);
+        }
+        long refTime = System.nanoTime() - refStartTime;
+        System.out.println("  ... Writing reference files: "
+            + (refTime / 1000000000) + " sec.");
       }
 
-      // Packages Pages
-      writePackages(javadocDir + refPrefix + "packages" + htmlExtension);
-
-      // Classes
-  writeClassLists();
-  writeClasses();
-  writeHierarchy();
-      // writeKeywords();
-
-      // Lists for JavaScript
-  writeLists();
-      if (keepListFile != null) {
-        writeKeepList(keepListFile);
-      }
-
-      // Index page
-  writeIndex();
-
-  Proofread.finishProofread(proofreadFile);
-
-  if (sdkValuePath != null) {
-    writeSdkValues(sdkValuePath);
-  }
       // Write metadata for all processed files to jd_lists_unified.js in out dir
       if (!sTaglist.isEmpty()) {
         PageMetadata.WriteList(sTaglist);
       }
     }
 
-    // Stubs
-    if (stubsDir != null || apiFile != null || proguardFile != null) {
-      Stubs.writeStubsAndApi(stubsDir, apiFile, proguardFile, stubPackages);
+    if (!brief_docs) {
+      // Stubs
+      if (stubsDir != null || apiFile != null || proguardFile != null) {
+        Stubs.writeStubsAndApi(stubsDir, apiFile, proguardFile, stubPackages);
+      }
     }
 
     Errors.printErrors();
@@ -548,6 +579,9 @@ public class Doclava {
       return 2;
     }
     if (option.equals("-devsite")) {
+      return 1;
+    }
+    if (option.equals("-briefdocs")) {
       return 1;
     }
     if (option.equals("-htmldir")) {
