@@ -64,7 +64,7 @@ public class NavTree {
 
     SortedMap<String, Object> sorted = new TreeMap<String, Object>();
     for (ClassInfo cl : classes) {
-      if (cl.isHidden()) {
+      if (cl.isHiddenOrRemoved()) {
         continue;
       }
       sorted.put(cl.qualifiedName(), cl);

@@ -458,37 +458,35 @@ public class Comment {
   }
 
   public boolean isHidden() {
-    if (mHidden != -1) {
-      return mHidden != 0;
-    } else {
-      if (Doclava.checkLevel(Doclava.SHOW_HIDDEN)) {
-        mHidden = 0;
-        return false;
-      }
-      boolean b = mText.indexOf("@hide") >= 0 || mText.indexOf("@pending") >= 0;
-      mHidden = b ? 1 : 0;
-      return b;
+    if (mHidden == null) {
+      mHidden = !Doclava.checkLevel(Doclava.SHOW_HIDDEN) &&
+          (mText != null) && (mText.indexOf("@hide") >= 0 || mText.indexOf("@pending") >= 0);
     }
+    return mHidden;
+  }
+
+  public boolean isRemoved() {
+    if (mRemoved == null) {
+        mRemoved = !Doclava.checkLevel(Doclava.SHOW_HIDDEN) &&
+            (mText != null) && (mText.indexOf("@removed") >= 0);
+    }
+
+    return mRemoved;
   }
 
   public boolean isDocOnly() {
-    if (mDocOnly != -1) {
-      return mDocOnly != 0;
-    } else {
-      boolean b = (mText != null) && (mText.indexOf("@doconly") >= 0);
-      mDocOnly = b ? 1 : 0;
-      return b;
+    if (mDocOnly == null) {
+      mDocOnly = (mText != null) && (mText.indexOf("@doconly") >= 0);
     }
+    return mDocOnly;
   }
-  
+
   public boolean isDeprecated() {
-    if (mDeprecated != -1) {
-      return mDeprecated != 0;
-    } else {
-      boolean b = (mText != null) && (mText.indexOf("@deprecated") >= 0);
-      mDeprecated = b ? 1 : 0;
-      return b;
+    if (mDeprecated == null) {
+      mDeprecated = (mText != null) && (mText.indexOf("@deprecated") >= 0);
     }
+
+    return mDeprecated;
   }
 
   private void init() {
@@ -499,6 +497,7 @@ public class Comment {
 
   private void initImpl() {
     isHidden();
+    isRemoved();
     isDocOnly();
     isDeprecated();
 
@@ -539,9 +538,10 @@ public class Comment {
   }
 
   boolean mInitialized;
-  int mHidden = -1;
-  int mDocOnly = -1;
-  int mDeprecated = -1;
+  Boolean mHidden = null;
+  Boolean mRemoved = null;
+  Boolean mDocOnly = null;
+  Boolean mDeprecated = null;
   String mText;
   ContainerInfo mBase;
   SourcePositionInfo mPosition;

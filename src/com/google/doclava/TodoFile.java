@@ -74,7 +74,7 @@ public class TodoFile {
     int classIndex = 0;
 
     for (ClassInfo cl : classes) {
-      if (cl.isHidden()) {
+      if (cl.isHiddenOrRemoved()){
         continue;
       }
 

@@ -103,10 +103,16 @@ public class ApiCheck {
 
     ApiInfo oldApi;
     ApiInfo newApi;
-    
+    ApiInfo oldRemovedApi;
+    ApiInfo newRemovedApi;
+
+    // commandline options look like:
+    // [other optoins] old_api.txt new_api.txt old_removed_api.txt new_removed_api.txt
     try {
       oldApi = parseApi(args.get(0));
       newApi = parseApi(args.get(1));
+      oldRemovedApi = parseApi(args.get(2));
+      newRemovedApi = parseApi(args.get(3));
     } catch (ApiParseException e) {
       e.printStackTrace();
       System.err.println("Error parsing API");
@@ -116,6 +122,10 @@ public class ApiCheck {
     // only run the consistency check if we haven't had XML parse errors
     if (!Errors.hadError) {
       oldApi.isConsistent(newApi);
+    }
+
+    if (!Errors.hadError) {
+      oldRemovedApi.isConsistent(newRemovedApi);
     }
 
     return new Report(Errors.hadError ? 1 : 0, Errors.getErrors());

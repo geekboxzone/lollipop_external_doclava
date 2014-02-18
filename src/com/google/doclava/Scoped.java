@@ -24,6 +24,4 @@ public interface Scoped {
   boolean isPackagePrivate();
 
   boolean isPrivate();
-
-  boolean isHidden();
 }

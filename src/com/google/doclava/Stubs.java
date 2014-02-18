@@ -32,12 +32,14 @@ import java.util.Set;
 
 public class Stubs {
   public static void writeStubsAndApi(String stubsDir, String apiFile, String keepListFile,
-      HashSet<String> stubPackages) {
+      String removedApiFile, HashSet<String> stubPackages) {
     // figure out which classes we need
     final HashSet<ClassInfo> notStrippable = new HashSet<ClassInfo>();
     ClassInfo[] all = Converter.allClasses();
     PrintStream apiWriter = null;
     PrintStream keepListWriter = null;
+    PrintStream removedApiWriter = null;
+
     if (apiFile != null) {
       try {
         File xml = new File(apiFile);
@@ -58,6 +60,17 @@ public class Stubs {
             "Cannot open file for write.");
       }
     }
+    if (removedApiFile != null) {
+      try {
+        File removedApi = new File(removedApiFile);
+        removedApi.getParentFile().mkdirs();
+        removedApiWriter = new PrintStream(
+            new BufferedOutputStream(new FileOutputStream(removedApi)));
+      } catch (FileNotFoundException e) {
+        Errors.error(Errors.IO_ERROR, new SourcePositionInfo(removedApiFile, 0, 0),
+            "Cannot open file for write");
+      }
+    }
     // If a class is public or protected, not hidden, and marked as included,
     // then we can't strip it
     for (ClassInfo cl : all) {
@@ -69,10 +82,10 @@ public class Stubs {
     // complain about anything that looks includeable but is not supposed to
     // be written, e.g. hidden things
     for (ClassInfo cl : notStrippable) {
-      if (!cl.isHidden()) {
+      if (!cl.isHiddenOrRemoved()) {
         for (MethodInfo m : cl.selfMethods()) {
-          if (m.isHidden()) {
-            Errors.error(Errors.UNAVAILABLE_SYMBOL, m.position(), "Reference to hidden method "
+          if (m.isHiddenOrRemoved()) {
+            Errors.error(Errors.UNAVAILABLE_SYMBOL, m.position(), "Reference to unavailable method "
                 + m.name());
           } else if (m.isDeprecated()) {
             // don't bother reporting deprecated methods
@@ -82,7 +95,7 @@ public class Stubs {
           }
 
           ClassInfo returnClass = m.returnType().asClassInfo();
-          if (returnClass != null && returnClass.isHidden()) {
+          if (returnClass != null && returnClass.isHiddenOrRemoved()) {
             Errors.error(Errors.UNAVAILABLE_SYMBOL, m.position(), "Method " + cl.qualifiedName()
                 + "." + m.name() + " returns unavailable type " + returnClass.name());
           }
@@ -90,8 +103,8 @@ public class Stubs {
           for (ParameterInfo p :  m.parameters()) {
             TypeInfo t = p.type();
             if (!t.isPrimitive()) {
-              if (t.asClassInfo().isHidden()) {
-                Errors.error(Errors.UNAVAILABLE_SYMBOL, m.position(), "Parameter of hidden type "
+              if (t.asClassInfo().isHiddenOrRemoved()) {
+                Errors.error(Errors.UNAVAILABLE_SYMBOL, m.position(), "Parameter of unavailable type "
                     + t.fullName() + " in " + cl.qualifiedName() + "." + m.name() + "()");
               }
             }
@@ -100,13 +113,13 @@ public class Stubs {
 
         // annotations are handled like methods
         for (MethodInfo m : cl.annotationElements()) {
-          if (m.isHidden()) {
-            Errors.error(Errors.UNAVAILABLE_SYMBOL, m.position(), "Reference to hidden annotation "
+          if (m.isHiddenOrRemoved()) {
+            Errors.error(Errors.UNAVAILABLE_SYMBOL, m.position(), "Reference to unavailable annotation "
                 + m.name());
           }
 
           ClassInfo returnClass = m.returnType().asClassInfo();
-          if (returnClass != null && returnClass.isHidden()) {
+          if (returnClass != null && returnClass.isHiddenOrRemoved()) {
             Errors.error(Errors.UNAVAILABLE_SYMBOL, m.position(), "Annotation '" + m.name()
                 + "' returns unavailable type " + returnClass.name());
           }
@@ -114,7 +127,7 @@ public class Stubs {
           for (ParameterInfo p :  m.parameters()) {
             TypeInfo t = p.type();
             if (!t.isPrimitive()) {
-              if (t.asClassInfo().isHidden()) {
+              if (t.asClassInfo().isHiddenOrRemoved()) {
                 Errors.error(Errors.UNAVAILABLE_SYMBOL, p.position(),
                     "Reference to unavailable annotation class " + t.fullName());
               }
@@ -128,6 +141,7 @@ public class Stubs {
       }
     }
 
+    // packages contains all the notStrippable classes mapped by their containing packages
     HashMap<PackageInfo, List<ClassInfo>> packages = new HashMap<PackageInfo, List<ClassInfo>>();
     for (ClassInfo cl : notStrippable) {
       if (!cl.isDocOnly()) {
@@ -149,7 +163,6 @@ public class Stubs {
         }
       }
     }
-
     // write out the Api
     if (apiWriter != null) {
       writeApi(apiWriter, packages, notStrippable);
@@ -160,6 +173,23 @@ public class Stubs {
     if (keepListWriter != null) {
       writeKeepList(keepListWriter, packages, notStrippable);
       keepListWriter.close();
+    }
+
+    HashMap<PackageInfo, List<ClassInfo>> allPackageClassMap =
+        new HashMap<PackageInfo, List<ClassInfo>>();
+    for (ClassInfo cl : Converter.allClasses()) {
+      if (allPackageClassMap.containsKey(cl.containingPackage())) {
+        allPackageClassMap.get(cl.containingPackage()).add(cl);
+      } else {
+        ArrayList<ClassInfo> classes = new ArrayList<ClassInfo>();
+        classes.add(cl);
+        allPackageClassMap.put(cl.containingPackage(), classes);
+      }
+    }
+    // write out the removed Api
+    if (removedApiWriter != null) {
+      writeRemovedApi(removedApiWriter, allPackageClassMap, notStrippable);
+      removedApiWriter.close();
     }
   }
 
@@ -217,7 +247,7 @@ public class Stubs {
     // blow open super class and interfaces
     ClassInfo supr = cl.realSuperclass();
     if (supr != null) {
-      if (supr.isHidden()) {
+      if (supr.isHiddenOrRemoved()) {
         // cl is a public class declared as extending a hidden superclass.
         // this is not a desired practice but it's happened, so we deal
         // with it by finding the first super class which passes checklevel for purposes of
@@ -256,7 +286,7 @@ public class Stubs {
                 for (TypeInfo tInfoType : pInfo.type().typeArguments()) {
                   if (tInfoType.asClassInfo() != null) {
                     ClassInfo tcl = tInfoType.asClassInfo();
-                    if (tcl.isHidden()) {
+                    if (tcl.isHiddenOrRemoved()) {
                       Errors
                           .error(Errors.UNAVAILABLE_SYMBOL, mInfo.position(),
                               "Parameter of hidden type " + tInfoType.fullName() + " in "
@@ -445,8 +475,8 @@ public class Stubs {
     // and the super class doesn't have a default constructor, write in a private constructor
     // that works. TODO -- we generate this as protected, but we really should generate
     // it as private unless it also exists in the real code.
-    if ((cl.constructors().isEmpty() && (!cl.getNonWrittenConstructors().isEmpty() || fieldNeedsInitialization))
-        && !cl.isAnnotation() && !cl.isInterface() && !cl.isEnum()) {
+    if ((cl.constructors().isEmpty() && (!cl.getNonWrittenConstructors().isEmpty() ||
+        fieldNeedsInitialization)) && !cl.isAnnotation() && !cl.isInterface() && !cl.isEnum()) {
       // Errors.error(Errors.HIDDEN_CONSTRUCTOR,
       // cl.position(), "No constructors " +
       // "found and superclass has no parameterless constructor.  A constructor " +
@@ -458,8 +488,9 @@ public class Stubs {
 
     for (MethodInfo method : cl.allSelfMethods()) {
       if (cl.isEnum()) {
-        if (("values".equals(method.name()) && "()".equals(method.signature()))
-            || ("valueOf".equals(method.name()) && "(java.lang.String)".equals(method.signature()))) {
+        if (("values".equals(method.name()) && "()".equals(method.signature())) ||
+            ("valueOf".equals(method.name()) &&
+            "(java.lang.String)".equals(method.signature()))) {
           // skip these two methods on enums, because they're synthetic,
           // although for some reason javadoc doesn't mark them as synthetic,
           // maybe because they still want them documented
@@ -470,15 +501,18 @@ public class Stubs {
         writeMethod(stream, method, false);
       }
     }
-    // Write all methods that are hidden, but override abstract methods or interface methods.
+    // Write all methods that are hidden or removed, but override abstract methods or interface methods.
     // These can't be hidden.
-    for (MethodInfo method : cl.getHiddenMethods()) {
+    List<MethodInfo> hiddenAndRemovedMethods = cl.getHiddenMethods();
+    hiddenAndRemovedMethods.addAll(cl.getRemovedMethods());
+    for (MethodInfo method : hiddenAndRemovedMethods) {
       MethodInfo overriddenMethod =
           method.findRealOverriddenMethod(method.name(), method.signature(), notStrippable);
       ClassInfo classContainingMethod =
           method.findRealOverriddenClass(method.name(), method.signature());
-      if (overriddenMethod != null && !overriddenMethod.isHidden() && !overriddenMethod.isDocOnly()
-          && (overriddenMethod.isAbstract() || overriddenMethod.containingClass().isInterface())) {
+      if (overriddenMethod != null && !overriddenMethod.isHiddenOrRemoved() &&
+          !overriddenMethod.isDocOnly() &&
+          (overriddenMethod.isAbstract() || overriddenMethod.containingClass().isInterface())) {
         method.setReason("1:" + classContainingMethod.qualifiedName());
         cl.addMethod(method);
         writeMethod(stream, method, false);
@@ -628,9 +662,9 @@ public class Stubs {
         // Look only for overrides of an ancestor class implementation,
         // not of e.g. an abstract or interface method declaration
         if (!om.isAbstract()) {
-          // If the parent is hidden, we can't rely on it to provide
+          // If the parent is hidden or removed, we can't rely on it to provide
           // the API
-          if (!om.isHidden()) {
+          if (!om.isHiddenOrRemoved()) {
             // If the only "override" turns out to be in our own class
             // (which sometimes happens in concrete subclasses of
             // abstract base classes), it's not really an override
@@ -751,7 +785,7 @@ public class Stubs {
       if (ann.type() != null && ann.type().qualifiedName().equals("java.lang.Override")) {
         continue;
       }
-      if (!ann.type().isHidden()) {
+      if (!ann.type().isHiddenOrRemoved()) {
         stream.println(ann.toString());
         if (isDeprecated && ann.type() != null
             && ann.type().qualifiedName().equals("java.lang.Deprecated")) {
@@ -993,6 +1027,105 @@ public class Stubs {
     return returnString;
   }
 
+  static void writeRemovedApi(PrintStream apiWriter, HashMap<PackageInfo,
+      List<ClassInfo>> allPackageClassMap, Set<ClassInfo> notStrippable) {
+    final PackageInfo[] packages = allPackageClassMap.keySet().toArray(new PackageInfo[0]);
+    Arrays.sort(packages, PackageInfo.comparator);
+    for (PackageInfo pkg : packages) {
+      // beware that pkg.allClasses() has no class in it at the moment
+      final List<ClassInfo> classes = allPackageClassMap.get(pkg);
+      Collections.sort(classes, ClassInfo.comparator);
+      boolean hasWrittenPackageHead = false;
+      for (ClassInfo cl : classes) {
+        if (cl.hasRemovedSelfMembers()) {
+          if (!hasWrittenPackageHead) {
+            hasWrittenPackageHead = true;
+            apiWriter.print("package ");
+            apiWriter.print(pkg.qualifiedName());
+            apiWriter.print(" {\n\n");
+          }
+          writeClassRemovedSelfMembers(apiWriter, cl, notStrippable);
+        }
+      }
+
+      // the package contains some classes with some removed members
+      if (hasWrittenPackageHead) {
+        apiWriter.print("}\n\n");
+      }
+    }
+  }
+
+  /**
+   * Write the removed members of the class to removed.txt
+   */
+  private static void writeClassRemovedSelfMembers(PrintStream apiWriter, ClassInfo cl,
+      Set<ClassInfo> notStrippable) {
+    apiWriter.print("  ");
+    apiWriter.print(cl.scope());
+    if (cl.isStatic()) {
+      apiWriter.print(" static");
+    }
+    if (cl.isFinal()) {
+      apiWriter.print(" final");
+    }
+    if (cl.isAbstract()) {
+      apiWriter.print(" abstract");
+    }
+    if (cl.isDeprecated()) {
+      apiWriter.print(" deprecated");
+    }
+    apiWriter.print(" ");
+    apiWriter.print(cl.isInterface() ? "interface" : "class");
+    apiWriter.print(" ");
+    apiWriter.print(cl.name());
+
+    if (!cl.isInterface()
+        && !"java.lang.Object".equals(cl.qualifiedName())
+        && cl.realSuperclass() != null
+        && !"java.lang.Object".equals(cl.realSuperclass().qualifiedName())) {
+      apiWriter.print(" extends ");
+      apiWriter.print(cl.realSuperclass().qualifiedName());
+    }
+
+    ArrayList<ClassInfo> interfaces = cl.realInterfaces();
+    Collections.sort(interfaces, ClassInfo.comparator);
+    boolean first = true;
+    for (ClassInfo iface : interfaces) {
+      if (notStrippable.contains(iface)) {
+        if (first) {
+          apiWriter.print(" implements");
+          first = false;
+        }
+        apiWriter.print(" ");
+        apiWriter.print(iface.qualifiedName());
+      }
+    }
+
+    apiWriter.print(" {\n");
+
+    List<MethodInfo> constructors = cl.getRemovedConstructors();
+    for (MethodInfo mi : constructors) {
+      writeConstructorApi(apiWriter, mi);
+    }
+
+    List<MethodInfo> methods = cl.getRemovedSelfMethods();
+    for (MethodInfo mi : methods) {
+      writeMethodApi(apiWriter, mi);
+    }
+
+    List<FieldInfo> enums = cl.getRemovedSelfEnumConstants();
+    for (FieldInfo fi : enums) {
+      writeFieldApi(apiWriter, fi, "enum_constant");
+    }
+
+    List<FieldInfo> fields = cl.getRemovedSelfFields();
+    for (FieldInfo fi : fields) {
+      writeFieldApi(apiWriter, fi, "field");
+    }
+
+    apiWriter.print("  }\n\n");
+  }
+
   public static void writeApi(PrintStream apiWriter, Collection<PackageInfo> pkgs) {
     final PackageInfo[] packages = pkgs.toArray(new PackageInfo[pkgs.size()]);
     Arrays.sort(packages, PackageInfo.comparator);
@@ -1163,7 +1296,8 @@ public class Stubs {
     apiWriter.print(";\n");
   }
 
-  static void writeParametersApi(PrintStream apiWriter, MethodInfo method, ArrayList<ParameterInfo> params) {
+  static void writeParametersApi(PrintStream apiWriter, MethodInfo method,
+      ArrayList<ParameterInfo> params) {
     apiWriter.print("(");
 
     for (ParameterInfo pi : params) {

@@ -84,42 +84,82 @@ public class PackageInfo extends DocInfo implements ContainerInfo {
 
   @Override
   public boolean isHidden() {
-    if (mHidden == -1) {
+    if (mHidden == null) {
       if (hasHideComment()) {
         // We change the hidden value of the package if a class wants to be not hidden.
-        ClassInfo[][] types = new ClassInfo[][] { annotations(), interfaces(), ordinaryClasses(), enums(), exceptions() };
+        ClassInfo[][] types = new ClassInfo[][] { annotations(), interfaces(), ordinaryClasses(),
+            enums(), exceptions() };
         for (ClassInfo[] type : types) {
           if (type != null) {
             for (ClassInfo c : type) {
               if (c.hasShowAnnotation()) {
-                mHidden = 0;
+                mHidden = false;
                 return false;
               }
             }
           }
         }
-        mHidden = 1;
+        mHidden = true;
       } else {
-        mHidden = 0;
+        mHidden = false;
       }
     }
-    return mHidden != 0;
+    return mHidden;
+  }
+
+  @Override
+  public boolean isRemoved() {
+    if (mRemoved == null) {
+      if (hasRemovedComment()) {
+        // We change the removed value of the package if a class wants to be not hidden.
+        ClassInfo[][] types = new ClassInfo[][] { annotations(), interfaces(), ordinaryClasses(),
+            enums(), exceptions() };
+        for (ClassInfo[] type : types) {
+          if (type != null) {
+            for (ClassInfo c : type) {
+              if (c.hasShowAnnotation()) {
+                mRemoved = false;
+                return false;
+              }
+            }
+          }
+        }
+        mRemoved = true;
+      } else {
+        mRemoved = false;
+      }
+    }
+
+    return mRemoved;
+  }
+
+  @Override
+  public boolean isHiddenOrRemoved() {
+    return isHidden() || isRemoved();
   }
 
   /**
    * Used by ClassInfo to determine packages default visability before annoations.
    */
   public boolean hasHideComment() {
-    if (mHiddenByComment == -1) {
-      mHiddenByComment = comment().isHidden() ? 1 : 0;
+    if (mHiddenByComment == null) {
+      mHiddenByComment = comment().isHidden();
     }
-    return mHiddenByComment != 0;
+    return mHiddenByComment;
+  }
+
+  public boolean hasRemovedComment() {
+    if (mRemovedByComment == null) {
+      mRemovedByComment = comment().isRemoved();
+    }
+
+    return mRemovedByComment;
   }
 
   public boolean checkLevel() {
     // TODO should return false if all classes are hidden but the package isn't.
     // We don't have this so I'm not doing it now.
-    return !isHidden();
+    return !isHiddenOrRemoved();
   }
 
   public String name() {
@@ -138,11 +178,15 @@ public class PackageInfo extends DocInfo implements ContainerInfo {
     return comment().briefTags();
   }
 
-  public static ClassInfo[] filterHidden(ClassInfo[] classes) {
+  /**
+   * @param classes the Array of ClassInfo to be filtered
+   * @return an Array of ClassInfo without any hidden or removed classes
+   */
+  public static ClassInfo[] filterHiddenAndRemoved(ClassInfo[] classes) {
     ArrayList<ClassInfo> out = new ArrayList<ClassInfo>();
 
     for (ClassInfo cl : classes) {
-      if (!cl.isHidden()) {
+      if (!cl.isHiddenOrRemoved()) {
         out.add(cl);
       }
     }
@@ -172,7 +216,8 @@ public class PackageInfo extends DocInfo implements ContainerInfo {
   public ClassInfo[] annotations() {
     if (mAnnotations == null) {
       mAnnotations =
-          ClassInfo.sortByName(filterHidden(Converter.convertClasses(mPackage.annotationTypes())));
+          ClassInfo.sortByName(filterHiddenAndRemoved(
+              Converter.convertClasses(mPackage.annotationTypes())));
     }
     return mAnnotations;
   }
@@ -180,7 +225,8 @@ public class PackageInfo extends DocInfo implements ContainerInfo {
   public ClassInfo[] interfaces() {
     if (mInterfaces == null) {
       mInterfaces =
-          ClassInfo.sortByName(filterHidden(Converter.convertClasses(mPackage.interfaces())));
+          ClassInfo.sortByName(filterHiddenAndRemoved(
+              Converter.convertClasses(mPackage.interfaces())));
     }
     return mInterfaces;
   }
@@ -188,14 +234,16 @@ public class PackageInfo extends DocInfo implements ContainerInfo {
   public ClassInfo[] ordinaryClasses() {
     if (mOrdinaryClasses == null) {
       mOrdinaryClasses =
-          ClassInfo.sortByName(filterHidden(Converter.convertClasses(mPackage.ordinaryClasses())));
+          ClassInfo.sortByName(filterHiddenAndRemoved(
+              Converter.convertClasses(mPackage.ordinaryClasses())));
     }
     return mOrdinaryClasses;
   }
 
   public ClassInfo[] enums() {
     if (mEnums == null) {
-      mEnums = ClassInfo.sortByName(filterHidden(Converter.convertClasses(mPackage.enums())));
+      mEnums = ClassInfo.sortByName(filterHiddenAndRemoved(
+          Converter.convertClasses(mPackage.enums())));
     }
     return mEnums;
   }
@@ -203,14 +251,16 @@ public class PackageInfo extends DocInfo implements ContainerInfo {
   public ClassInfo[] exceptions() {
     if (mExceptions == null) {
       mExceptions =
-          ClassInfo.sortByName(filterHidden(Converter.convertClasses(mPackage.exceptions())));
+          ClassInfo.sortByName(filterHiddenAndRemoved(
+              Converter.convertClasses(mPackage.exceptions())));
     }
     return mExceptions;
   }
 
   public ClassInfo[] errors() {
     if (mErrors == null) {
-      mErrors = ClassInfo.sortByName(filterHidden(Converter.convertClasses(mPackage.errors())));
+      mErrors = ClassInfo.sortByName(filterHiddenAndRemoved(
+          Converter.convertClasses(mPackage.errors())));
     }
     return mErrors;
   }
@@ -229,8 +279,10 @@ public class PackageInfo extends DocInfo implements ContainerInfo {
     return mName.hashCode();
   }
 
-  private int mHidden = -1;
-  private int mHiddenByComment = -1;
+  private Boolean mHidden = null;
+  private Boolean mHiddenByComment = null;
+  private Boolean mRemoved = null;
+  private Boolean mRemovedByComment = null;
   private String mName;
   private PackageDoc mPackage;
   private ApiInfo mContainingApi;

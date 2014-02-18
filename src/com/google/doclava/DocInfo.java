@@ -32,9 +32,28 @@ public abstract class DocInfo {
    * The relative path to a web page representing this item.
    */
   public abstract String htmlPage();
-  
+
+  /**
+   * @return true if the element has never been a part of public API
+   */
   public boolean isHidden() {
     return comment().isHidden();
+  }
+
+  /**
+   * @return true if the element was once a part of public API, now removed.
+   */
+  public boolean isRemoved() {
+    return comment().isRemoved();
+  }
+
+  /**
+   * Hidden and removed elements should not be appear in api.txt files, nor
+   * should they appear in the java doc.
+   * @return true if the element is either hidden or removed.
+   */
+  public boolean isHiddenOrRemoved() {
+   return isHidden() || isRemoved();
   }
 
   public boolean isDocOnly() {
@@ -84,7 +103,7 @@ public abstract class DocInfo {
   public String getSince() {
     return mSince;
   }
-  
+
   public void setDeprecatedSince(String since) {
     mDeprecatedSince = since;
   }
@@ -100,11 +119,11 @@ public abstract class DocInfo {
   public final void addFederatedReference(FederatedSite source) {
     mFederatedReferences.add(source);
   }
-  
+
   public final Set<FederatedSite> getFederatedReferences() {
     return mFederatedReferences;
   }
-  
+
   public final void setFederatedReferences(Data data, String base) {
     int pos = 0;
     for (FederatedSite source : getFederatedReferences()) {
