@@ -771,11 +771,6 @@ public class Doclava {
           Data data = makeHDF();
           String filename = templ.substring(0, len - 3) + htmlExtension;
           DocFile.writePage(f.getAbsolutePath(), relative, filename, data);
-          String[] sections = relative.split("\\/");
-          boolean isIntl = ((sections.length > 0) && (sections[0].equals("intl")));
-          //if (!isIntl) {
-          PageMetadata.setPageMetadata(f, relative, filename, data, sTaglist);
-          //}
         } else if(!f.getName().equals(".DS_Store")){
               Data data = makeHDF();
               String hdfValue = data.getValue("sac") == null ? "" : data.getValue("sac");
