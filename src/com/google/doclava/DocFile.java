@@ -72,7 +72,7 @@ public class DocFile {
     }
     return outFrag;
   }
-
+  
   public static Data getPageMetadata (String docfile, Data hdf) {
     //utility method for extracting metadata without generating file output.
     if (hdf == null) {
@@ -230,9 +230,6 @@ public class DocFile {
       } else if (filename.indexOf("compatibility") == 0) {
         hdf.setValue("compatibility", "true");
       }
-      //set metadata for this file in jd_lists_unified
-      PageMetadata.setPageMetadata(docfile, relative, outfile, hdf, Doclava.sTaglist);
-
       if (fromTemplate.equals("sdk")) {
         ClearPage.write(hdf, "sdkpage.cs", outfile);
       } else {
