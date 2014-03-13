@@ -31,7 +31,7 @@ import java.util.Map;
 
 /**
  * Applies version information to the Doclava class model from apicheck XML files. Sample usage:
- * 
+ *
  * <pre>
  *   ClassInfo[] classInfos = ...
  *
@@ -59,7 +59,7 @@ public class SinceTagger {
     for (Map.Entry<String, String> versionSpec : xmlToName.entrySet()) {
       String xmlFile = versionSpec.getKey();
       String versionName = versionSpec.getValue();
-      
+
       ApiInfo specApi;
       try {
         specApi = new ApiCheck().parseApi(xmlFile);
@@ -96,7 +96,7 @@ public class SinceTagger {
 
   /**
    * Applies the version information to {@code classDocs} where not already present.
-   * 
+   *
    * @param versionName the version name
    * @param specApi the spec for this version. If a symbol is in this spec, it was present in the
    *        named version
@@ -266,7 +266,8 @@ public class SinceTagger {
     List<T> result = Collections.emptyList();
     for (T t : all) {
       // if this member has version info or isn't documented, skip it
-      if (t.getSince() != null || t.isHidden() || !checkLevelRecursive(t.realContainingClass())) {
+      if (t.getSince() != null || t.isHiddenOrRemoved() ||
+          !checkLevelRecursive(t.realContainingClass())) {
         continue;
       }
 

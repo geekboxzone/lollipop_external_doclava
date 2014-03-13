@@ -114,7 +114,6 @@ public class Doclava {
 
   public static boolean checkLevel(boolean pub, boolean prot, boolean pkgp, boolean priv,
       boolean hidden) {
-    int level = 0;
     if (hidden && !checkLevel(SHOW_HIDDEN)) {
       return false;
     }
@@ -148,6 +147,7 @@ public class Doclava {
     // Create the dependency graph for the stubs  directory
     boolean offlineMode = false;
     String apiFile = null;
+    String removedApiFile = null;
     String debugStubsFile = "";
     HashSet<String> stubPackages = null;
     ArrayList<String> knownTagsFiles = new ArrayList<String>();
@@ -234,7 +234,10 @@ public class Doclava {
         sdkValuePath = a[1];
       } else if (a[0].equals("-api")) {
         apiFile = a[1];
-      } else if (a[0].equals("-nodocs")) {
+      } else if (a[0].equals("-removedApi")) {
+        removedApiFile = a[1];
+      }
+      else if (a[0].equals("-nodocs")) {
         generateDocs = false;
       } else if (a[0].equals("-nodefaultassets")) {
         includeDefaultAssets = false;
@@ -336,7 +339,7 @@ public class Doclava {
       }
 
       writeAssets();
-      
+
       // Navigation tree
       String refPrefix = new String();
       if(gmsRef){
@@ -381,8 +384,8 @@ public class Doclava {
     }
 
     // Stubs
-    if (stubsDir != null || apiFile != null || proguardFile != null) {
-      Stubs.writeStubsAndApi(stubsDir, apiFile, proguardFile, stubPackages);
+    if (stubsDir != null || apiFile != null || proguardFile != null || removedApiFile != null) {
+      Stubs.writeStubsAndApi(stubsDir, apiFile, proguardFile, removedApiFile, stubPackages);
     }
 
     Errors.printErrors();
@@ -609,6 +612,9 @@ public class Doclava {
     if (option.equals("-api")) {
       return 2;
     }
+    if (option.equals("-removedApi")) {
+      return 2;
+    }
     if (option.equals("-nodocs")) {
       return 1;
     }
@@ -693,10 +699,10 @@ public class Doclava {
     for (String s : sorted.keySet()) {
       PackageInfo pkg = sorted.get(s);
 
-      if (pkg.isHidden()) {
+      if (pkg.isHiddenOrRemoved()) {
         continue;
       }
-      Boolean allHidden = true;
+      boolean allHiddenOrRemoved = true;
       int pass = 0;
       ClassInfo[] classesToCheck = null;
       while (pass < 6) {
@@ -724,17 +730,17 @@ public class Doclava {
             break;
         }
         for (ClassInfo cl : classesToCheck) {
-          if (!cl.isHidden()) {
-            allHidden = false;
+          if (!cl.isHiddenOrRemoved()) {
+            allHiddenOrRemoved = false;
             break;
           }
         }
-        if (!allHidden) {
+        if (!allHiddenOrRemoved) {
           break;
         }
         pass++;
       }
-      if (allHidden) {
+      if (allHiddenOrRemoved) {
         continue;
       }
       if(gmsRef){
@@ -843,7 +849,7 @@ public class Doclava {
 
     SortedMap<String, Object> sorted = new TreeMap<String, Object>();
     for (ClassInfo cl : classes) {
-      if (cl.isHidden()) {
+      if (cl.isHiddenOrRemoved()) {
         continue;
       }
       sorted.put(cl.qualifiedName(), cl);
@@ -912,7 +918,8 @@ public class Doclava {
         // If it's a .jd file we want to process
         if (len > 3 && ".jd".equals(templ.substring(len - 3))) {
           // remove the directories below the site root
-          String webPath = filePath.substring(filePath.indexOf("docs/html/") + 10, filePath.length());
+          String webPath = filePath.substring(filePath.indexOf("docs/html/") + 10,
+              filePath.length());
           // replace .jd with .html
           webPath = webPath.substring(0, webPath.length() - 3) + htmlExtension;
           // Parse the .jd file for properties data at top of page
@@ -1025,7 +1032,7 @@ public class Doclava {
     // If a class is public and not hidden, then it and everything it derives
     // from cannot be stripped. Otherwise we can strip it.
     for (ClassInfo cl : all) {
-      if (cl.isPublic() && !cl.isHidden()) {
+      if (cl.isPublic() && !cl.isHiddenOrRemoved()) {
         cantStripThis(cl, notStrippable);
       }
     }
@@ -1069,10 +1076,11 @@ public class Doclava {
     for (String s : sorted.keySet()) {
       PackageInfo pkg = sorted.get(s);
 
-      if (pkg.isHidden()) {
+      if (pkg.isHiddenOrRemoved()) {
         continue;
       }
-      Boolean allHidden = true;
+
+      boolean allHiddenOrRemoved = true;
       int pass = 0;
       ClassInfo[] classesToCheck = null;
       while (pass < 6) {
@@ -1100,17 +1108,17 @@ public class Doclava {
             break;
         }
         for (ClassInfo cl : classesToCheck) {
-          if (!cl.isHidden()) {
-            allHidden = false;
+          if (!cl.isHiddenOrRemoved()) {
+            allHiddenOrRemoved = false;
             break;
           }
         }
-        if (!allHidden) {
+        if (!allHiddenOrRemoved) {
           break;
         }
         pass++;
       }
-      if (allHidden) {
+      if (allHiddenOrRemoved) {
         continue;
       }
 
@@ -1177,7 +1185,8 @@ public class Doclava {
     int i;
     Data data = makePackageHDF();
 
-    ClassInfo[] classes = PackageInfo.filterHidden(Converter.convertClasses(root.classes()));
+    ClassInfo[] classes = PackageInfo.filterHiddenAndRemoved(
+        Converter.convertClasses(root.classes()));
     if (classes.length == 0) {
       return;
     }
@@ -1231,7 +1240,7 @@ public class Doclava {
    * public static void writeKeywords() { ArrayList<KeywordEntry> keywords = new
    * ArrayList<KeywordEntry>();
    *
-   * ClassInfo[] classes = PackageInfo.filterHidden(Converter.convertClasses(root.classes()));
+   * ClassInfo[] classes = PackageInfo.filterHiddenAndRemoved(Converter.convertClasses(root.classes()));
    *
    * for (ClassInfo cl: classes) { cl.makeKeywordEntries(keywords); }
    *
@@ -1250,7 +1259,7 @@ public class Doclava {
     ClassInfo[] classes = Converter.rootClasses();
     ArrayList<ClassInfo> info = new ArrayList<ClassInfo>();
     for (ClassInfo cl : classes) {
-      if (!cl.isHidden()) {
+      if (!cl.isHiddenOrRemoved()) {
         info.add(cl);
       }
     }
@@ -1265,7 +1274,7 @@ public class Doclava {
 
     for (ClassInfo cl : classes) {
       Data data = makePackageHDF();
-      if (!cl.isHidden()) {
+      if (!cl.isHiddenOrRemoved()) {
         writeClass(cl, data);
       }
     }
@@ -1282,7 +1291,7 @@ public class Doclava {
   public static void makeClassListHDF(Data data, String base, ClassInfo[] classes) {
     for (int i = 0; i < classes.length; i++) {
       ClassInfo cl = classes[i];
-      if (!cl.isHidden()) {
+      if (!cl.isHiddenOrRemoved()) {
         cl.makeShortDescrHDF(data, base + "." + i);
       }
     }
@@ -1318,20 +1327,21 @@ public class Doclava {
   }
 
   /**
-   * Returns true if the given element has an @hide or @pending annotation.
+   * Returns true if the given element has an @hide, @removed or @pending annotation.
    */
-  private static boolean hasHideAnnotation(Doc doc) {
+  private static boolean hasHideOrRemovedAnnotation(Doc doc) {
     String comment = doc.getRawCommentText();
-    return comment.indexOf("@hide") != -1 || comment.indexOf("@pending") != -1;
+    return comment.indexOf("@hide") != -1 || comment.indexOf("@pending") != -1 ||
+        comment.indexOf("@removed") != -1;
   }
 
   /**
    * Returns true if the given element is hidden.
    */
-  private static boolean isHidden(Doc doc) {
+  private static boolean isHiddenOrRemoved(Doc doc) {
     // Methods, fields, constructors.
     if (doc instanceof MemberDoc) {
-      return hasHideAnnotation(doc);
+      return hasHideOrRemovedAnnotation(doc);
     }
 
     // Classes, interfaces, enums, annotation types.
@@ -1339,7 +1349,7 @@ public class Doclava {
       ClassDoc classDoc = (ClassDoc) doc;
 
       // Check the containing package.
-      if (hasHideAnnotation(classDoc.containingPackage())) {
+      if (hasHideOrRemovedAnnotation(classDoc.containingPackage())) {
         return true;
       }
 
@@ -1347,7 +1357,7 @@ public class Doclava {
       // nested class.
       ClassDoc current = classDoc;
       do {
-        if (hasHideAnnotation(current)) {
+        if (hasHideOrRemovedAnnotation(current)) {
           return true;
         }
 
@@ -1359,9 +1369,9 @@ public class Doclava {
   }
 
   /**
-   * Filters out hidden elements.
+   * Filters out hidden and removed elements.
    */
-  private static Object filterHidden(Object o, Class<?> expected) {
+  private static Object filterHiddenAndRemoved(Object o, Class<?> expected) {
     if (o == null) {
       return null;
     }
@@ -1376,10 +1386,10 @@ public class Doclava {
       Object[] array = (Object[]) o;
       List<Object> list = new ArrayList<Object>(array.length);
       for (Object entry : array) {
-        if ((entry instanceof Doc) && isHidden((Doc) entry)) {
+        if ((entry instanceof Doc) && isHiddenOrRemoved((Doc) entry)) {
           continue;
         }
-        list.add(filterHidden(entry, componentType));
+        list.add(filterHiddenAndRemoved(entry, componentType));
       }
       return list.toArray((Object[]) Array.newInstance(componentType, list.size()));
     } else {
@@ -1417,7 +1427,7 @@ public class Doclava {
       }
 
       try {
-        return filterHidden(method.invoke(target, args), method.getReturnType());
+        return filterHiddenAndRemoved(method.invoke(target, args), method.getReturnType());
       } catch (InvocationTargetException e) {
         throw e.getTargetException();
       }
@@ -1497,7 +1507,7 @@ public class Doclava {
 
       // Now check the class for @Widget or if its in the android.widget package
       // (unless the class is hidden or abstract, or non public)
-      if (clazz.isHidden() == false && clazz.isPublic() && clazz.isAbstract() == false) {
+      if (clazz.isHiddenOrRemoved() == false && clazz.isPublic() && clazz.isAbstract() == false) {
         boolean annotated = false;
         ArrayList<AnnotationInstanceInfo> annotations = clazz.annotations();
         if (!annotations.isEmpty()) {
@@ -1765,5 +1775,5 @@ public class Doclava {
       return false;
     }
   }
-  
+
 }

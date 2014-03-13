@@ -117,10 +117,18 @@ public class ClassInfo extends DocInfo implements ContainerInfo, Comparable, Sco
     mRealInterfaces = new ArrayList<ClassInfo>(interfaces);
     mRealInterfaceTypes = interfaceTypes;
     mInnerClasses = innerClasses;
+    // mAllConstructors will not contain *all* constructors. Only the constructors that pass
+    // checkLevel. @see {@link Converter#convertMethods(ConstructorDoc[])}
     mAllConstructors = constructors;
+    // mAllSelfMethods will not contain *all* self methods. Only the methods that pass
+    // checkLevel. @see {@link Converter#convertMethods(MethodDoc[])}
     mAllSelfMethods = methods;
     mAnnotationElements = annotationElements;
+    // mAllSelfFields will not contain *all* self fields. Only the fields that pass
+    // checkLevel. @see {@link Converter#convetFields(FieldDoc[])}
     mAllSelfFields = fields;
+    // mEnumConstants will not contain *all* enum constants. Only the enums that pass
+    // checkLevel. @see {@link Converter#convetFields(FieldDoc[])}
     mEnumConstants = enumConstants;
     mContainingPackage = containingPackage;
     mContainingClass = containingClass;
@@ -162,16 +170,17 @@ public class ClassInfo extends DocInfo implements ContainerInfo, Comparable, Sco
     return mTypeParameters;
   }
 
+  /**
+   * @return true if this class needs to be shown in api txt, based on the
+   * hidden/removed status of the class and the show level setting in doclava.
+   */
   public boolean checkLevel() {
-    int val = mCheckLevel;
-    if (val >= 0) {
-      return val != 0;
-    } else {
-      boolean v =
-          Doclava.checkLevel(mIsPublic, mIsProtected, mIsPackagePrivate, mIsPrivate, isHidden());
-      mCheckLevel = v ? 1 : 0;
-      return v;
+    if (mCheckLevel == null) {
+      mCheckLevel = Doclava.checkLevel(mIsPublic, mIsProtected, mIsPackagePrivate, mIsPrivate,
+          isHiddenOrRemoved());
     }
+
+    return mCheckLevel;
   }
 
   public int compareTo(Object that) {
@@ -350,7 +359,7 @@ public class ClassInfo extends DocInfo implements ContainerInfo, Comparable, Sco
 
       mConstructors = new ArrayList<MethodInfo>();
       for (MethodInfo m : mAllConstructors) {
-        if (!m.isHidden()) {
+        if (!m.isHiddenOrRemoved()) {
             mConstructors.add(m);
         }
       }
@@ -462,13 +471,13 @@ public class ClassInfo extends DocInfo implements ContainerInfo, Comparable, Sco
       }
 
       for (FieldInfo field : selfFields()) {
-        if (!field.isHidden()) {
+        if (!field.isHiddenOrRemoved()) {
             all.put(field.name(), field);
         }
       }
 
       for (FieldInfo enumConst : mEnumConstants) {
-        if (!enumConst.isHidden()) {
+        if (!enumConst.isHiddenOrRemoved()) {
             all.put(enumConst.name(), enumConst);
         }
       }
@@ -500,7 +509,7 @@ public class ClassInfo extends DocInfo implements ContainerInfo, Comparable, Sco
       }
 
       for (FieldInfo f : mAllSelfFields) {
-          if (!f.isHidden()) {
+          if (!f.isHiddenOrRemoved()) {
               fields.put(f.name(), f);
           }
       }
@@ -539,7 +548,7 @@ public class ClassInfo extends DocInfo implements ContainerInfo, Comparable, Sco
       if (mAllSelfMethods != null) {
         for (MethodInfo m : mAllSelfMethods) {
           if (m.checkLevel()) {
-              methods.put(m.name() + m.signature(), m);
+            methods.put(m.name() + m.signature(), m);
           }
         }
       }
@@ -553,6 +562,150 @@ public class ClassInfo extends DocInfo implements ContainerInfo, Comparable, Sco
 
   public ArrayList<MethodInfo> allSelfMethods() {
     return mAllSelfMethods;
+  }
+
+  /**
+   * @param removedMethods the removed methods regardless of access levels.
+   */
+  public void setRemovedMethods(List<MethodInfo> removedMethods) {
+    Collections.sort(removedMethods, MethodInfo.comparator);
+    mRemovedMethods = Collections.unmodifiableList(removedMethods);
+  }
+
+  /**
+   * @param allMethods all methods regardless of access levels. Selects the
+   * removed, public/protected ones and store them. If a class is removed, all its members
+   * are removed, even if the member may not have a @removed tag.
+   */
+  public void setRemovedSelfMethods(List<MethodInfo> allMethods) {
+    List<MethodInfo> removedSelfMethods = new ArrayList<MethodInfo>();
+    for (MethodInfo method : allMethods) {
+      if ((this.isRemoved() || method.isRemoved()) && (method.isPublic() || method.isProtected()) &&
+          (this.isPublic() || this.isProtected()) &&
+          (method.findOverriddenMethod(method.name(), method.signature()) == null)) {
+        removedSelfMethods.add(method);
+      }
+    }
+
+    Collections.sort(removedSelfMethods, MethodInfo.comparator);
+    mRemovedSelfMethods = Collections.unmodifiableList(removedSelfMethods);
+  }
+
+  /**
+   * @param allCtors all constructors regardless of access levels.
+   * But only the public/protected removed constructors will be stored by the method.
+   * Removed constructors should never be deleted from source code because
+   * they were once public API.
+   */
+  public void setRemovedConstructors(List<MethodInfo> allCtors) {
+    List<MethodInfo> ctors = new ArrayList<MethodInfo>();
+    for (MethodInfo ctor : allCtors) {
+      if ((this.isRemoved() || ctor.isRemoved()) && (ctor.isPublic() || ctor.isProtected()) &&
+          (this.isPublic() || this.isProtected())) {
+        ctors.add(ctor);
+      }
+    }
+
+    Collections.sort(ctors, MethodInfo.comparator);
+    mRemovedConstructors = Collections.unmodifiableList(ctors);
+  }
+
+  /**
+   * @param allFields all fields regardless of access levels.  Selects the
+   * removed, public/protected ones and store them. If a class is removed, all its members
+   * are removed, even if the member may not have a @removed tag.
+   */
+  public void setRemovedSelfFields(List<FieldInfo> allFields) {
+    List<FieldInfo> fields = new ArrayList<FieldInfo>();
+    for (FieldInfo field : allFields) {
+      if ((this.isRemoved() || field.isRemoved()) && (field.isPublic() || field.isProtected()) &&
+          (this.isPublic() || this.isProtected())) {
+        fields.add(field);
+      }
+    }
+
+    Collections.sort(fields, FieldInfo.comparator);
+    mRemovedSelfFields = Collections.unmodifiableList(fields);
+  }
+
+  /**
+   * @param allEnumConstants all enum constants regardless of access levels. Selects the
+   * removed, public/protected ones and store them. If a class is removed, all its members
+   * are removed, even if the member may not have a @removed tag.
+   */
+  public void setRemovedEnumConstants(List<FieldInfo> allEnumConstants) {
+    List<FieldInfo> enums = new ArrayList<FieldInfo>();
+    for (FieldInfo field : allEnumConstants) {
+      if ((this.isRemoved() || field.isRemoved()) && (field.isPublic() || field.isProtected()) &&
+          (this.isPublic() || this.isProtected())) {
+        enums.add(field);
+      }
+    }
+
+    Collections.sort(enums, FieldInfo.comparator);
+    mRemovedEnumConstants = Collections.unmodifiableList(enums);
+  }
+
+  /**
+   * @return all methods that are marked as removed, regardless of access levels.
+   * The returned list is sorted and unmodifiable.
+   */
+  public List<MethodInfo> getRemovedMethods() {
+    return mRemovedMethods;
+  }
+
+  /**
+   * @return all public/protected methods that are removed. @removed methods should never be
+   * deleted from source code because they were once public API. Methods that override
+   * a parent method will not be included, because deleting them does not break the API.
+   */
+  public List<MethodInfo> getRemovedSelfMethods() {
+    return mRemovedSelfMethods;
+  }
+
+  /**
+   * @return all public constructors that are removed.
+   * removed constructors should never be deleted from source code because they
+   * were once public API.
+   * The returned list is sorted and unmodifiable.
+   */
+  public List<MethodInfo> getRemovedConstructors() {
+    return mRemovedConstructors;
+  }
+
+  /**
+   * @return all public/protected fields that are removed.
+   * removed members should never be deleted from source code because they were once public API.
+   * The returned list is sorted and unmodifiable.
+   */
+  public List<FieldInfo> getRemovedSelfFields() {
+    return mRemovedSelfFields;
+  }
+
+  /**
+   * @return all public/protected enumConstants that are removed.
+   * removed members should never be deleted from source code
+   * because they were once public API.
+   * The returned list is sorted and unmodifiable.
+   */
+  public List<FieldInfo> getRemovedSelfEnumConstants() {
+    return mRemovedEnumConstants;
+  }
+
+  /**
+   * @return true if this class contains any self members that are removed
+   */
+  public boolean hasRemovedSelfMembers() {
+    List<FieldInfo> removedSelfFields = getRemovedSelfFields();
+    List<FieldInfo> removedSelfEnumConstants = getRemovedSelfEnumConstants();
+    List<MethodInfo> removedSelfMethods = getRemovedSelfMethods();
+    List<MethodInfo> removedConstructors = getRemovedConstructors();
+    if (removedSelfFields.size() + removedSelfEnumConstants.size()
+        + removedSelfMethods.size() + removedConstructors.size() == 0) {
+      return false;
+    } else {
+      return true;
+    }
   }
 
   public void addMethod(MethodInfo method) {
@@ -1195,16 +1348,17 @@ public class ClassInfo extends DocInfo implements ContainerInfo, Comparable, Sco
 
   @Override
   public boolean isHidden() {
-    int val = mHidden;
-    if (val >= 0) {
-      return val != 0;
-    } else {
-      boolean v = isHiddenImpl();
-      mHidden = v ? 1 : 0;
-      return v;
+    if (mHidden == null) {
+      mHidden = isHiddenImpl();
     }
+
+    return mHidden;
   }
 
+  /**
+   * @return true if the containing package has @hide comment, or an ancestor
+   * class of this class is hidden, or this class has @hide comment.
+   */
   public boolean isHiddenImpl() {
     ClassInfo cl = this;
     while (cl != null) {
@@ -1221,6 +1375,42 @@ public class ClassInfo extends DocInfo implements ContainerInfo, Comparable, Sco
       cl = cl.containingClass();
     }
     return false;
+  }
+
+  @Override
+  public boolean isRemoved() {
+    if (mRemoved == null) {
+      mRemoved = isRemovedImpl();
+    }
+
+    return mRemoved;
+  }
+
+  /**
+   * @return true if the containing package has @removed comment, or an ancestor
+   * class of this class is removed, or this class has @removed comment.
+   */
+  public boolean isRemovedImpl() {
+    ClassInfo cl = this;
+    while (cl != null) {
+      if (cl.hasShowAnnotation()) {
+        return false;
+      }
+      PackageInfo pkg = cl.containingPackage();
+      if (pkg != null && pkg.hasRemovedComment()) {
+        return true;
+      }
+      if (cl.comment().isRemoved()) {
+        return true;
+      }
+      cl = cl.containingClass();
+    }
+    return false;
+  }
+
+  @Override
+  public boolean isHiddenOrRemoved() {
+    return isHidden() || isRemoved();
   }
 
   public boolean hasShowAnnotation() {
@@ -1481,7 +1671,11 @@ public class ClassInfo extends DocInfo implements ContainerInfo, Comparable, Sco
   private ArrayList<ClassInfo> mInterfaces;
   private ArrayList<TypeInfo> mRealInterfaceTypes;
   private ArrayList<ClassInfo> mInnerClasses;
+  // mAllConstructors will not contain *all* constructors. Only the constructors that pass
+  // checkLevel. @see {@link Converter#convertMethods(ConstructorDoc[])}
   private ArrayList<MethodInfo> mAllConstructors = new ArrayList<MethodInfo>();
+  // mAllSelfMethods will not contain *all* self methods. Only the methods that pass
+  // checkLevel. @see {@link Converter#convertMethods(MethodDoc[])}
   private ArrayList<MethodInfo> mAllSelfMethods = new ArrayList<MethodInfo>();
   private ArrayList<MethodInfo> mAnnotationElements = new ArrayList<MethodInfo>(); // if this class is an annotation
   private ArrayList<FieldInfo> mAllSelfFields = new ArrayList<FieldInfo>();
@@ -1505,8 +1699,9 @@ public class ClassInfo extends DocInfo implements ContainerInfo, Comparable, Sco
   private ArrayList<FieldInfo> mFields;
   private ArrayList<TypeInfo> mTypeParameters;
   private ArrayList<MethodInfo> mHiddenMethods;
-  private int mHidden = -1;
-  private int mCheckLevel = -1;
+  private Boolean mHidden = null;
+  private Boolean mRemoved = null;
+  private Boolean mCheckLevel = null;
   private String mReasonIncluded;
   private ArrayList<MethodInfo> mNonWrittenConstructors;
   private boolean mIsDeprecated;
@@ -1519,6 +1714,13 @@ public class ClassInfo extends DocInfo implements ContainerInfo, Comparable, Sco
 
   // Resolutions
   private ArrayList<Resolution> mResolutions;
+
+  private List<MethodInfo> mRemovedConstructors; // immutable after you set its value.
+  // @removed self methods that do not override any parent methods
+  private List<MethodInfo> mRemovedSelfMethods; // immutable after you set its value.
+  private List<MethodInfo> mRemovedMethods; // immutable after you set its value.
+  private List<FieldInfo> mRemovedSelfFields; // immutable after you set its value.
+  private List<FieldInfo> mRemovedEnumConstants; // immutable after you set its value.
 
   /**
    * Returns true if {@code cl} implements the interface {@code iface} either by either being that
@@ -1805,7 +2007,7 @@ public class ClassInfo extends DocInfo implements ContainerInfo, Comparable, Sco
     return consistent;
   }
 
-  // Find a superclass implementation of the given method.
+  // Find a superclass implementation of the given method based on the methods in mApiCheckMethods.
   public static MethodInfo overriddenMethod(MethodInfo candidate, ClassInfo newClassObj) {
     if (newClassObj == null) {
       return null;

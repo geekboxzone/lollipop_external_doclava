@@ -54,6 +54,23 @@ public abstract class MemberInfo extends DocInfo implements Comparable, Scoped {
     return super.isHidden();
   }
 
+  @Override
+  public boolean isRemoved() {
+    if (mAnnotations != null) {
+      for (AnnotationInstanceInfo info : mAnnotations) {
+        if (Doclava.showAnnotations.contains(info.type().qualifiedName())) {
+          return false;
+        }
+      }
+    }
+    return super.isRemoved();
+  }
+
+  @Override
+  public boolean isHiddenOrRemoved() {
+    return isHidden() || isRemoved();
+  }
+
   public String anchor() {
     if (mSignature != null) {
       return mName + mSignature;
@@ -101,7 +118,7 @@ public abstract class MemberInfo extends DocInfo implements Comparable, Scoped {
   public boolean isPrivate() {
     return mIsPrivate;
   }
-  
+
   public String scope() {
     if (isPublic()) {
       return "public";
@@ -134,7 +151,8 @@ public abstract class MemberInfo extends DocInfo implements Comparable, Scoped {
   }
 
   public boolean checkLevel() {
-    return Doclava.checkLevel(mIsPublic, mIsProtected, mIsPackagePrivate, mIsPrivate, isHidden());
+    return Doclava.checkLevel(mIsPublic, mIsProtected, mIsPackagePrivate, mIsPrivate,
+        isHiddenOrRemoved());
   }
 
   public String kind() {
