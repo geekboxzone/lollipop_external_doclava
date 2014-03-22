@@ -54,6 +54,7 @@ public class SeeTagInfo extends TagInfo {
     data.setValue(base + ".label", linkRef.label);
     if (linkRef.href != null) {
       data.setValue(base + ".href", linkRef.href);
+      data.setValue(base + ".federatedSite", linkRef.federatedSite);
     }
 
     if (ClearPage.toroot != null) {

@@ -70,10 +70,16 @@ def:tag_list(tags) ?><?cs
   each:tag = tags ?><?cs
       if:tag.name == "Text" ?><?cs var:tag.text?><?cs
       elif:tag.kind == "@more" ?><p><?cs
-      elif:tag.kind == "@see" ?><code><a href="<?cs var:toroot ?><?cs var:tag.href ?>"><?cs var:tag.label ?></a></code><?cs
+      elif:tag.kind == "@see" ?><code><a href="<?cs
+        if:!tag.federatedSite ?><?cs
+          var:toroot ?><?cs
+        /if ?><?cs var:tag.href ?>"><?cs var:tag.label ?></a></code><?cs
       elif:tag.kind == "@seeHref" ?><a href="<?cs var:tag.href ?>"><?cs var:tag.label ?></a><?cs
       elif:tag.kind == "@seeJustLabel" ?><?cs var:tag.label ?><?cs
-      elif:tag.kind == "@value" ?><code><a href="<?cs var:toroot ?><?cs var:tag.href ?>"><?cs var:tag.text ?></a></code><?cs
+      elif:tag.kind == "@value" ?><code><a href="<?cs
+        if:!tag.federatedSite ?><?cs
+          var:toroot ?><?cs
+        /if ?><?cs var:tag.href ?>"><?cs var:tag.text ?></a></code><?cs
       elif:tag.kind == "@code" ?><code><?cs var:tag.text ?></code><?cs
       elif:tag.kind == "@samplecode" ?><pre><?cs var:tag.text ?></pre><?cs
       elif:tag.name == "@sample" ?><pre><?cs var:tag.text ?></pre><?cs
