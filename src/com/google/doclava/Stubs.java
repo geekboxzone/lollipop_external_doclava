@@ -1431,9 +1431,8 @@ public class Stubs {
     ArrayList<MethodInfo> methods = cl.allSelfMethods();
     Collections.sort(methods, MethodInfo.comparator);
     for (MethodInfo mi : methods) {
-      if (!methodIsOverride(notStrippable, mi)) {
-        writeMethodKeepList(keepListWriter, mi);
-      }
+      // allSelfMethods is the non-hidden and visible methods. See Doclava.checkLevel.
+      writeMethodKeepList(keepListWriter, mi);
     }
 
     keepListWriter.print("\n");
