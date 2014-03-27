@@ -229,6 +229,8 @@ public class DocFile {
         hdf.setValue("accessories", "true");
       } else if (filename.indexOf("compatibility") == 0) {
         hdf.setValue("compatibility", "true");
+      } else if (filename.indexOf("wear") == 0) {
+        hdf.setValue("wear", "true");
       }
       if (fromTemplate.equals("sdk")) {
         ClearPage.write(hdf, "sdkpage.cs", outfile);
