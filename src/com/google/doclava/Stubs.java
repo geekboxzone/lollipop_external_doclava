@@ -209,8 +209,8 @@ public class Stubs {
      * }
      */
     // cant strip any public fields or their generics
-    if (cl.allSelfFields() != null) {
-      for (FieldInfo fInfo : cl.allSelfFields()) {
+    if (cl.selfFields() != null) {
+      for (FieldInfo fInfo : cl.selfFields()) {
         if (fInfo.type() != null) {
           if (fInfo.type().asClassInfo() != null) {
             cantStripThis(fInfo.type().asClassInfo(), notStrippable, "2:" + cl.qualifiedName());
@@ -457,7 +457,7 @@ public class Stubs {
 
     boolean fieldNeedsInitialization = false;
     boolean staticFieldNeedsInitialization = false;
-    for (FieldInfo field : cl.allSelfFields()) {
+    for (FieldInfo field : cl.selfFields()) {
       if (!field.isDocOnly()) {
         if (!field.isStatic() && field.isFinal() && !fieldIsInitialized(field)) {
           fieldNeedsInitialization = true;
@@ -525,7 +525,7 @@ public class Stubs {
       }
     }
 
-    for (FieldInfo field : cl.allSelfFields()) {
+    for (FieldInfo field : cl.selfFields()) {
       if (!field.isDocOnly()) {
         writeField(stream, field);
       }
@@ -533,7 +533,7 @@ public class Stubs {
 
     if (staticFieldNeedsInitialization) {
       stream.print("static { ");
-      for (FieldInfo field : cl.allSelfFields()) {
+      for (FieldInfo field : cl.selfFields()) {
         if (!field.isDocOnly() && field.isStatic() && field.isFinal() && !fieldIsInitialized(field)
             && field.constantValue() == null) {
           stream.print(field.name() + " = " + field.type().defaultValue() + "; ");
@@ -906,7 +906,7 @@ public class Stubs {
       }
     }
 
-    ArrayList<FieldInfo> fields = cl.allSelfFields();
+    ArrayList<FieldInfo> fields = cl.selfFields();
     Collections.sort(fields, FieldInfo.comparator);
     for (FieldInfo fi : fields) {
       writeFieldXML(xmlWriter, fi);
@@ -1240,7 +1240,7 @@ public class Stubs {
       writeFieldApi(apiWriter, fi, "enum_constant");
     }
 
-    ArrayList<FieldInfo> fields = cl.allSelfFields();
+    ArrayList<FieldInfo> fields = cl.selfFields();
     Collections.sort(fields, FieldInfo.comparator);
     for (FieldInfo fi : fields) {
       writeFieldApi(apiWriter, fi, "field");
@@ -1445,7 +1445,7 @@ public class Stubs {
 
     keepListWriter.print("\n");
 
-    ArrayList<FieldInfo> fields = cl.allSelfFields();
+    ArrayList<FieldInfo> fields = cl.selfFields();
     Collections.sort(fields, FieldInfo.comparator);
     for (FieldInfo fi : fields) {
       writeFieldKeepList(keepListWriter, fi);
