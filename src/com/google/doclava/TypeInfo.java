@@ -150,15 +150,26 @@ public class TypeInfo implements Resolvable {
     return mFullName;
   }
 
-  public String fullNameNoDimension(HashSet<String> typeVars) {
-    String fullName = null;
+  public String fullNameNoBounds(HashSet<String> typeVars) {
+    return fullNameNoDimensionNoBounds(typeVars) + mDimension;
+  }
+
+  // don't recurse forever with the parameters. This handles
+  // Enum<K extends Enum<K>>
+  private boolean checkRecurringTypeVar(HashSet<String> typeVars) {
     if (mIsTypeVariable) {
       if (typeVars.contains(mQualifiedTypeName)) {
-        // don't recurse forever with the parameters. This handles
-        // Enum<K extends Enum<K>>
-        return mQualifiedTypeName;
+        return true;
       }
       typeVars.add(mQualifiedTypeName);
+    }
+    return false;
+  }
+
+  private String fullNameNoDimensionNoBounds(HashSet<String> typeVars) {
+    String fullName = null;
+    if (checkRecurringTypeVar(typeVars)) {
+      return mQualifiedTypeName;
     }
     /*
      * if (fullName != null) { return fullName; }
@@ -166,22 +177,34 @@ public class TypeInfo implements Resolvable {
     fullName = mQualifiedTypeName;
     if (mTypeArguments != null && !mTypeArguments.isEmpty()) {
       fullName += typeArgumentsName(mTypeArguments, typeVars);
-    } else if (mSuperBounds != null && !mSuperBounds.isEmpty()) {
+    }
+    return fullName;
+  }
+
+  public String fullNameNoDimension(HashSet<String> typeVars) {
+    String fullName = null;
+    if (checkRecurringTypeVar(typeVars)) {
+      return mQualifiedTypeName;
+    }
+    fullName = fullNameNoDimensionNoBounds(typeVars);
+    if (mTypeArguments == null || mTypeArguments.isEmpty()) {
+       if (mSuperBounds != null && !mSuperBounds.isEmpty()) {
         for (TypeInfo superBound : mSuperBounds) {
             if (superBound == mSuperBounds.get(0)) {
-                fullName += " super " + superBound.fullName(typeVars);
+                fullName += " super " + superBound.fullNameNoBounds(typeVars);
             } else {
-                fullName += " & " + superBound.fullName(typeVars);
+                fullName += " & " + superBound.fullNameNoBounds(typeVars);
             }
         }
-    } else if (mExtendsBounds != null && !mExtendsBounds.isEmpty()) {
+      } else if (mExtendsBounds != null && !mExtendsBounds.isEmpty()) {
         for (TypeInfo extendsBound : mExtendsBounds) {
             if (extendsBound == mExtendsBounds.get(0)) {
-                fullName += " extends " + extendsBound.fullName(typeVars);
+                fullName += " extends " + extendsBound.fullNameNoBounds(typeVars);
             } else {
-                fullName += " & " + extendsBound.fullName(typeVars);
+                fullName += " & " + extendsBound.fullNameNoBounds(typeVars);
             }
         }
+      }
     }
     return fullName;
   }
