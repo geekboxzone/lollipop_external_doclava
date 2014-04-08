@@ -55,19 +55,24 @@ public class DocFile {
       "ru", "zh-cn", "zh-tw", "pt-br"};
 
   public static String getPathRoot(String filename) {
-    //look for a valid lang string in the file path. If found,
-    //snip the intl/lang from the path.
-    for (String t : DEVSITE_VALID_LANGS) {
-      int langStart = filename.indexOf("/" + t + "/");
-      if (langStart > -1) {
-        int langEnd = filename.indexOf("/", langStart + 1);
-        filename = filename.substring(langEnd + 1);
-        break;
+    String[] stripStr = filename.split("\\/");
+    String outFrag = stripStr[0];
+    if (stripStr.length > 0) {
+      for (String t : DEVSITE_VALID_LANGS) {
+        if (stripStr[0].equals("intl")) {
+          if (stripStr[1].equals(t)) {
+            outFrag = stripStr[2];
+            break;
+          }
+        } else if (stripStr[0].equals(t)) {
+            outFrag = stripStr[1];
+            break;
+        }
       }
     }
-    return filename;
+    return outFrag;
   }
-
+  
   public static Data getPageMetadata (String docfile, Data hdf) {
     //utility method for extracting metadata without generating file output.
     if (hdf == null) {
@@ -188,7 +193,6 @@ public class DocFile {
         hdf.setValue("page.type", "design");
       } else if (filename.indexOf("develop") == 0) {
         hdf.setValue("develop", "true");
-        hdf.setValue("page.type", "develop");
       } else if (filename.indexOf("guide") == 0) {
         hdf.setValue("guide", "true");
         hdf.setValue("page.type", "guide");
@@ -209,21 +213,6 @@ public class DocFile {
       } else if (filename.indexOf("distribute") == 0) {
         hdf.setValue("distribute", "true");
         hdf.setValue("page.type", "distribute");
-        if (filename.indexOf("distribute/googleplay") == 0) {
-          hdf.setValue("googleplay", "true");
-        } else if (filename.indexOf("distribute/essentials") == 0) {
-          hdf.setValue("essentials", "true");
-        } else if (filename.indexOf("distribute/users") == 0) {
-          hdf.setValue("users", "true");
-        } else if (filename.indexOf("distribute/engage") == 0) {
-          hdf.setValue("engage", "true");
-        } else if (filename.indexOf("distribute/monetize") == 0) {
-          hdf.setValue("monetize", "true");
-        } else if (filename.indexOf("distribute/tools") == 0) {
-          hdf.setValue("disttools", "true");
-        } else if (filename.indexOf("distribute/stories") == 0) {
-          hdf.setValue("stories", "true");
-        }
       } else if (filename.indexOf("about") == 0) {
         hdf.setValue("about", "true");
         hdf.setValue("page.type", "about");
@@ -243,9 +232,6 @@ public class DocFile {
       } else if (filename.indexOf("wear") == 0) {
         hdf.setValue("wear", "true");
       }
-      //set metadata for this file in jd_lists_unified
-      PageMetadata.setPageMetadata(docfile, relative, outfile, hdf, Doclava.sTaglist);
-
       if (fromTemplate.equals("sdk")) {
         ClearPage.write(hdf, "sdkpage.cs", outfile);
       } else {

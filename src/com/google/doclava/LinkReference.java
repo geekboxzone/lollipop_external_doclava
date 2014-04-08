@@ -59,7 +59,7 @@ public class LinkReference {
   public boolean good;
 
   /**
-   * regex pattern to use when matching explicit 'a href' reference text
+   * regex pattern to use when matching explicit "<a href" reference text
    */
   private static final Pattern HREF_PATTERN =
       Pattern.compile("^<a href=\"([^\"]*)\">([^<]*)</a>[ \n\r\t]*$", Pattern.CASE_INSENSITIVE);

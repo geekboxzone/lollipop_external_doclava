@@ -66,8 +66,6 @@ public class Doclava {
   public static int showLevel = SHOW_PROTECTED;
 
   public static final boolean SORT_BY_NAV_GROUPS = true;
-  /* Debug output for PageMetadata, format urls from site root */
-  public static boolean META_DBG=false;
 
   public static String outputPathBase = "/";
   public static ArrayList<String> inputPathHtmlDirs = new ArrayList<String>();
@@ -249,8 +247,6 @@ public class Doclava {
         sinceTagger.addVersion(a[1], a[2]);
       } else if (a[0].equals("-offlinemode")) {
         offlineMode = true;
-      } else if (a[0].equals("-metadataDebug")) {
-        META_DBG = true;
       } else if (a[0].equals("-federate")) {
         try {
           String name = a[1];
@@ -320,10 +316,10 @@ public class Doclava {
         TodoFile.writeTodoFile(todoFile);
       }
 
-  if (samplesRef) {
+      if (samplesRef) {
         // always write samples without offlineMode behaviors
-  writeSamples(false, sampleCodes, SORT_BY_NAV_GROUPS);
-  }
+        writeSamples(false, sampleCodes, SORT_BY_NAV_GROUPS);
+      }
 
       // HTML2 Pages -- Generate Pages from optional secondary dir
       if (!inputPathHtmlDir2.isEmpty()) {
@@ -362,25 +358,25 @@ public class Doclava {
       writePackages(javadocDir + refPrefix + "packages" + htmlExtension);
 
       // Classes
-  writeClassLists();
-  writeClasses();
-  writeHierarchy();
+      writeClassLists();
+      writeClasses();
+      writeHierarchy();
       // writeKeywords();
 
       // Lists for JavaScript
-  writeLists();
+      writeLists();
       if (keepListFile != null) {
         writeKeepList(keepListFile);
       }
 
       // Index page
-  writeIndex();
+      writeIndex();
 
-  Proofread.finishProofread(proofreadFile);
+      Proofread.finishProofread(proofreadFile);
 
-  if (sdkValuePath != null) {
-    writeSdkValues(sdkValuePath);
-  }
+      if (sdkValuePath != null) {
+        writeSdkValues(sdkValuePath);
+      }
       // Write metadata for all processed files to jd_lists_unified.js in out dir
       if (!sTaglist.isEmpty()) {
         PageMetadata.WriteList(sTaglist);
@@ -654,9 +650,6 @@ public class Doclava {
       gcmRef = true;
       return 1;
     }
-    if (option.equals("-metadataDebug")) {
-      return 1;
-    }
     return 0;
   }
   public static boolean validOptions(String[][] options, DocErrorReporter r) {
@@ -784,6 +777,11 @@ public class Doclava {
           Data data = makeHDF();
           String filename = templ.substring(0, len - 3) + htmlExtension;
           DocFile.writePage(f.getAbsolutePath(), relative, filename, data);
+          String[] sections = relative.split("\\/");
+          boolean isIntl = ((sections.length > 0) && (sections[0].equals("intl")));
+          //if (!isIntl) {
+          PageMetadata.setPageMetadata(f, relative, filename, data, sTaglist);
+          //}
         } else if(!f.getName().equals(".DS_Store")){
               Data data = makeHDF();
               String hdfValue = data.getValue("sac") == null ? "" : data.getValue("sac");

@@ -26,5 +26,4 @@ dependencies {
     compile files(findToolsJar())
     compile project(path: ':antlr', configuration: 'antlrRuntime')
     compile project(':jsilver')
-    compile project(':tagsoup')
 }
