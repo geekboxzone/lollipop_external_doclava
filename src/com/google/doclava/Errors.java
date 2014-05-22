@@ -47,7 +47,7 @@ public class Errors {
       String whereText = this.pos == null ? "unknown: " : this.pos.toString() + ':';
       return whereText + this.msg;
     }
-
+    
     public Error error() {
       return error;
     }
@@ -72,7 +72,7 @@ public class Errors {
       hadError = true;
     }
   }
-
+  
   public static void clearErrors() {
     hadError = false;
     allErrors.clear();
@@ -81,7 +81,7 @@ public class Errors {
   public static void printErrors() {
     printErrors(allErrors);
   }
-
+  
   public static void printErrors(Set<ErrorMessage> errors) {
     for (ErrorMessage m : errors) {
       if (m.error.level == WARNING) {
@@ -94,7 +94,7 @@ public class Errors {
       }
     }
   }
-
+  
   public static Set<ErrorMessage> getErrors() {
     return allErrors;
   }
@@ -115,7 +115,7 @@ public class Errors {
       this.code = code;
       this.level = level;
     }
-
+    
     public String toString() {
       return "Error #" + this.code;
     }
@@ -171,7 +171,6 @@ public class Errors {
   public static final Error BROKEN_SINCE_FILE = new Error(118, ERROR);
   public static final Error INVALID_CONTENT_TYPE = new Error(119, ERROR);
   public static final Error INVALID_SAMPLE_INDEX = new Error(120, ERROR);
-  public static final Error SHOW_ANNOTATION_NOT_HIDDEN = new Error(121, WARNING);
 
   public static final Error[] ERRORS =
       {UNRESOLVED_LINK, BAD_INCLUDE_TAG, UNKNOWN_TAG, UNKNOWN_PARAM_TAG_NAME,
