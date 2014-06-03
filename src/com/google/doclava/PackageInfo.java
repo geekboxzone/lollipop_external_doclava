@@ -143,7 +143,11 @@ public class PackageInfo extends DocInfo implements ContainerInfo {
    */
   public boolean hasHideComment() {
     if (mHiddenByComment == null) {
-      mHiddenByComment = comment().isHidden();
+      if (Doclava.hiddenPackages.contains(mName)) {
+        mHiddenByComment = true;
+      } else {
+        mHiddenByComment = comment().isHidden();
+      }
     }
     return mHiddenByComment;
   }
