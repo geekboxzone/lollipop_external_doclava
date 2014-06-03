@@ -88,6 +88,7 @@ public class Doclava {
   public static HashSet<String> knownTags = new HashSet<String>();
   public static FederationTagger federationTagger = new FederationTagger();
   public static Set<String> showAnnotations = new HashSet<String>();
+  public static Set<String> hiddenPackages = new HashSet<String>();
   public static boolean includeDefaultAssets = true;
   private static boolean generateDocs = true;
   private static boolean parseComments = false;
@@ -207,6 +208,8 @@ public class Doclava {
         keepListFile = a[1];
       } else if (a[0].equals("-showAnnotation")) {
         showAnnotations.add(a[1]);
+      } else if (a[0].equals("-hidePackage")) {
+        hiddenPackages.add(a[1]);
       } else if (a[0].equals("-proguard")) {
         proguardFile = a[1];
       } else if (a[0].equals("-proofread")) {
@@ -571,6 +574,9 @@ public class Doclava {
       return 2;
     }
     if (option.equals("-showAnnotation")) {
+      return 2;
+    }
+    if (option.equals("-hidePackage")) {
       return 2;
     }
     if (option.equals("-proguard")) {
