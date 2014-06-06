@@ -83,6 +83,9 @@ public class PackageInfo extends DocInfo implements ContainerInfo {
 
   @Override
   public boolean isHidden() {
+    if (Doclava.hiddenPackages.contains(mName)) {
+      return true;
+    }
     return comment().isHidden();
   }
 
