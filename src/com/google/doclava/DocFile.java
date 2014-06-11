@@ -242,6 +242,12 @@ public class DocFile {
         hdf.setValue("compatibility", "true");
       } else if (filename.indexOf("wear") == 0) {
         hdf.setValue("wear", "true");
+      } else if (filename.indexOf("preview") == 0) {
+        hdf.setValue("preview", "true");
+      } else if (filename.indexOf("auto") == 0) {
+        hdf.setValue("auto", "true");
+      } else if (filename.indexOf("tv") == 0) {
+        hdf.setValue("tv", "true");
       }
       //set metadata for this file in jd_lists_unified
       PageMetadata.setPageMetadata(docfile, relative, outfile, hdf, Doclava.sTaglist);
