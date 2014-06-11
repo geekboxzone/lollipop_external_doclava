@@ -1480,6 +1480,9 @@ public class Doclava {
 
     ClassInfo[] classes = Converter.allClasses();
 
+    // The topmost LayoutParams class - android.view.ViewGroup.LayoutParams
+    ClassInfo topLayoutParams = null;
+
     // Go through all the fields of all the classes, looking SDK stuff.
     for (ClassInfo clazz : classes) {
 
@@ -1533,10 +1536,12 @@ public class Doclava {
         }
 
         if (annotated == false) {
-          // lets check if this is inside android.widget
-          PackageInfo pckg = clazz.containingPackage();
-          String packageName = pckg.name();
-          if ("android.widget".equals(packageName) || "android.view".equals(packageName)) {
+          if (topLayoutParams == null
+              && "android.view.ViewGroup.LayoutParams".equals(clazz.qualifiedName())) {
+            topLayoutParams = clazz;
+          }
+          // let's check if this is inside android.widget or android.view
+          if (isIncludedPackage(clazz)) {
             // now we check what this class inherits either from android.view.ViewGroup
             // or android.view.View, or android.view.ViewGroup.LayoutParams
             int type = checkInheritance(clazz);
@@ -1577,9 +1582,14 @@ public class Doclava {
     // before writing the list of classes, we do some checks, to make sure the layout params
     // are enclosed by a layout class (and not one that has been declared as a widget)
     for (int i = 0; i < layoutParams.size();) {
-      ClassInfo layoutParamClass = layoutParams.get(i);
-      ClassInfo containingClass = layoutParamClass.containingClass();
-      if (containingClass == null || layouts.indexOf(containingClass) == -1) {
+      ClassInfo clazz = layoutParams.get(i);
+      ClassInfo containingClass = clazz.containingClass();
+      boolean remove = containingClass == null || layouts.indexOf(containingClass) == -1;
+      // Also ensure that super classes of the layout params are in android.widget or android.view.
+      while (!remove && (clazz = clazz.superclass()) != null && !clazz.equals(topLayoutParams)) {
+        remove = !isIncludedPackage(clazz);
+      }
+      if (remove) {
         layoutParams.remove(i);
       } else {
         i++;
@@ -1587,6 +1597,14 @@ public class Doclava {
     }
 
     writeClasses(output + "/widgets.txt", widgets, layouts, layoutParams);
+  }
+
+  /**
+   * Check if the clazz is in package android.view or android.widget
+   */
+  private static boolean isIncludedPackage(ClassInfo clazz) {
+    String pckg = clazz.containingPackage().name();
+    return "android.widget".equals(pckg) || "android.view".equals(pckg);
   }
 
   /**
