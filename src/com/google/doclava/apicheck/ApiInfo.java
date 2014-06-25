@@ -46,7 +46,12 @@ public class ApiInfo {
         continue;
       }
       for (String iface : ifaces) {
-        cl.addInterface(mAllClasses.get(iface));
+        ClassInfo ci = mAllClasses.get(iface);
+        if (ci == null) {
+          // Interface not provided by this codebase. Inject a stub.
+          ci = new ClassInfo(iface);
+        }
+        cl.addInterface(ci);
       }
     }
   }
@@ -78,11 +83,11 @@ public class ApiInfo {
   public HashMap<String, PackageInfo> getPackages() {
     return mPackages;
   }
-  
+
   protected void mapClassToSuper(ClassInfo classInfo, String superclass) {
     mClassToSuper.put(classInfo, superclass);
   }
-  
+
   protected void mapClassToInterface(ClassInfo classInfo, String iface) {
     if (!mClassToInterface.containsKey(classInfo)) {
       mClassToInterface.put(classInfo, new ArrayList<String>());

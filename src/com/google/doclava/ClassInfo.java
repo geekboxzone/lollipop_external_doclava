@@ -1730,7 +1730,7 @@ public class ClassInfo extends DocInfo implements ContainerInfo, Comparable, Sco
     if (qualifiedName().equals(iface)) {
       return true;
     }
-    for (ClassInfo clImplements : interfaces()) {
+    for (ClassInfo clImplements : realInterfaces()) {
       if (clImplements.implementsInterface(iface)) {
         return true;
       }
