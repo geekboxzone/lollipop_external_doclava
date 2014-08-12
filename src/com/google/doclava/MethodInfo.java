@@ -575,7 +575,12 @@ public class MethodInfo extends MemberInfo implements AbstractMethodInfo, Resolv
     if (mTypeParameters != null) {
       TypeInfo.makeHDF(data, base + ".generic.typeArguments", mTypeParameters, false);
     }
-    
+
+    AnnotationInstanceInfo.makeLinkListHDF(
+      data,
+      base + ".showAnnotations",
+      showAnnotations().toArray(new AnnotationInstanceInfo[showAnnotations().size()]));
+
     setFederatedReferences(data, base);
   }
 
