@@ -1790,14 +1790,28 @@ public class Doclava {
 
   /**
   * Test whether a given directory is the root directory for a sample code project.
-  * Root directories must include both a src/ directory and a valid _index.jd file.
+  * Root directories must contain a valid _index.jd file and a src/ directory
+  * or a module directory that contains a src/ directory.
   */
   public static boolean isValidSampleProjectRoot(File dir) {
-    File srcDir = new File(dir.getAbsolutePath(), "src");
-    File indexJd = new File(dir.getAbsolutePath(), "_index.jd");
-    if (srcDir.exists() && indexJd.exists()) {
+    File indexJd = new File(dir, "_index.jd");
+    if (!indexJd.exists()) {
+      return false;
+    }
+    File srcDir = new File(dir, "src");
+    if (srcDir.exists()) {
       return true;
     } else {
+      // Look for a src/ directory one level below the root directory, so
+      // modules are supported.
+      for (File childDir : dir.listFiles()) {
+        if (childDir.isDirectory()) {
+          srcDir = new File(childDir, "src");
+          if (srcDir.exists()) {
+            return true;
+          }
+        }
+      }
       return false;
     }
   }
