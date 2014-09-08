@@ -1518,7 +1518,7 @@ public class Stubs {
     }
 
     keepListWriter.print(" ");
-    keepListWriter.print(getCleanTypeName(fi.type()) + fi.type().dimension());
+    keepListWriter.print(getCleanTypeName(fi.type()));
 
     keepListWriter.print(" ");
     keepListWriter.print(fi.name());
