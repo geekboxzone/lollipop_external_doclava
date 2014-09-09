@@ -104,6 +104,7 @@ public class ClassInfo extends DocInfo implements ContainerInfo, Comparable, Sco
     mQualifiedTypeName = qualifiedTypeName;
     mIsPrimitive = isPrimitive;
     mAnnotations = annotations;
+    mShowAnnotations = AnnotationInstanceInfo.getShowAnnotationsIntersection(annotations);
   }
 
   public void init(TypeInfo typeInfo, ArrayList<ClassInfo> interfaces,
@@ -135,6 +136,7 @@ public class ClassInfo extends DocInfo implements ContainerInfo, Comparable, Sco
     mRealSuperclass = superclass;
     mRealSuperclassType = superclassType;
     mAnnotations = annotations;
+    mShowAnnotations = AnnotationInstanceInfo.getShowAnnotationsIntersection(annotations);
 
     // after providing new methods and new superclass info,clear any cached
     // lists of self + superclass methods, ctors, etc.
@@ -1025,6 +1027,12 @@ public class ClassInfo extends DocInfo implements ContainerInfo, Comparable, Sco
     if (isDeprecated()) {
       data.setValue(base + ".deprecatedsince", getDeprecatedSince());
     }
+
+    AnnotationInstanceInfo.makeLinkListHDF(
+      data,
+      base + ".showAnnotations",
+      showAnnotations().toArray(new AnnotationInstanceInfo[showAnnotations().size()]));
+
     setFederatedReferences(data, base);
   }
 
@@ -1061,6 +1069,11 @@ public class ClassInfo extends DocInfo implements ContainerInfo, Comparable, Sco
     if (isAbstract() && !isInterface()) {
       data.setValue("class.abstract", "abstract");
     }
+
+    AnnotationInstanceInfo.makeLinkListHDF(
+      data,
+      "class.showAnnotations",
+      showAnnotations().toArray(new AnnotationInstanceInfo[showAnnotations().size()]));
 
     // class info
     String kind = kind();
@@ -1414,14 +1427,11 @@ public class ClassInfo extends DocInfo implements ContainerInfo, Comparable, Sco
   }
 
   public boolean hasShowAnnotation() {
-    if (annotations() != null) {
-      for (AnnotationInstanceInfo info : annotations()) {
-        if (Doclava.showAnnotations.contains(info.type().qualifiedName())) {
-          return true;
-        }
-      }
-    }
-    return false;
+    return mShowAnnotations.size() > 0;
+  }
+
+  public ArrayList<AnnotationInstanceInfo> showAnnotations() {
+    return mShowAnnotations;
   }
 
   private MethodInfo matchMethod(ArrayList<MethodInfo> methods, String name, String[] params,
@@ -1686,6 +1696,7 @@ public class ClassInfo extends DocInfo implements ContainerInfo, Comparable, Sco
   private TypeInfo mRealSuperclassType;
   private ClassInfo mSuperclass;
   private ArrayList<AnnotationInstanceInfo> mAnnotations;
+  private ArrayList<AnnotationInstanceInfo> mShowAnnotations;
   private boolean mSuperclassInit;
   private boolean mDeprecatedKnown;
 

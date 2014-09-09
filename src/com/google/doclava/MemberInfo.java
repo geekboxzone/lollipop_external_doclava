@@ -38,30 +38,23 @@ public abstract class MemberInfo extends DocInfo implements Comparable, Scoped {
     mIsSynthetic = isSynthetic;
     mKind = kind;
     mAnnotations = annotations;
+    mShowAnnotations = AnnotationInstanceInfo.getShowAnnotationsIntersection(annotations);
   }
 
   public abstract boolean isExecutable();
 
   @Override
   public boolean isHidden() {
-    if (mAnnotations != null) {
-      for (AnnotationInstanceInfo info : mAnnotations) {
-        if (Doclava.showAnnotations.contains(info.type().qualifiedName())) {
-          return false;
-        }
-      }
+    if (mShowAnnotations.size() > 0) {
+      return false;
     }
     return super.isHidden();
   }
 
   @Override
   public boolean isRemoved() {
-    if (mAnnotations != null) {
-      for (AnnotationInstanceInfo info : mAnnotations) {
-        if (Doclava.showAnnotations.contains(info.type().qualifiedName())) {
-          return false;
-        }
-      }
+    if (mShowAnnotations.size() > 0) {
+      return false;
     }
     return super.isRemoved();
   }
@@ -163,6 +156,10 @@ public abstract class MemberInfo extends DocInfo implements Comparable, Scoped {
     return mAnnotations;
   }
 
+  public ArrayList<AnnotationInstanceInfo> showAnnotations() {
+    return mShowAnnotations;
+  }
+
   ClassInfo mContainingClass;
   ClassInfo mRealContainingClass;
   String mName;
@@ -176,5 +173,6 @@ public abstract class MemberInfo extends DocInfo implements Comparable, Scoped {
   boolean mIsSynthetic;
   String mKind;
   private ArrayList<AnnotationInstanceInfo> mAnnotations;
+  private ArrayList<AnnotationInstanceInfo> mShowAnnotations;
 
 }

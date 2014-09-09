@@ -16,6 +16,8 @@
 
 package com.google.doclava;
 
+import com.google.clearsilver.jsilver.data.Data;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 
@@ -116,5 +118,33 @@ public class AnnotationInstanceInfo implements Resolvable {
       }
 
       return allResolved;
+  }
+
+  public static void makeLinkListHDF(Data data, String base, AnnotationInstanceInfo[] annotations) {
+    if (annotations == null) return;
+
+    final int N = annotations.length;
+    for (int i = 0; i < N; i++) {
+      AnnotationInstanceInfo aii = annotations[i];
+      aii.type().makeShortDescrHDF(data, base + "." + i);
+    }
+  }
+
+  /**
+   * Get a new list containing the set of annotations that are shared between
+   * the input annotations collection and the names of annotations passed in
+   * the showAnnotations parameter
+   */
+  public static ArrayList<AnnotationInstanceInfo> getShowAnnotationsIntersection(
+          ArrayList<AnnotationInstanceInfo> annotations) {
+    ArrayList<AnnotationInstanceInfo> list = new ArrayList<AnnotationInstanceInfo>();
+    if (annotations != null) {
+      for (AnnotationInstanceInfo info : annotations) {
+        if (Doclava.showAnnotations.contains(info.type().qualifiedName())) {
+          list.add(info);
+        }
+      }
+    }
+    return list;
   }
 }
