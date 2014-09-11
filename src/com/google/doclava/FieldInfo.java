@@ -381,7 +381,12 @@ public class FieldInfo extends MemberInfo {
         data.setValue(base + ".constantValue.isString", "1");
       }
     }
-    
+
+    AnnotationInstanceInfo.makeLinkListHDF(
+      data,
+      base + ".showAnnotations",
+      showAnnotations().toArray(new AnnotationInstanceInfo[showAnnotations().size()]));
+
     setFederatedReferences(data, base);
   }
 
