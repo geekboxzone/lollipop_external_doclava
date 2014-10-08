@@ -1028,10 +1028,11 @@ public class ClassInfo extends DocInfo implements ContainerInfo, Comparable, Sco
       data.setValue(base + ".deprecatedsince", getDeprecatedSince());
     }
 
+    ArrayList<AnnotationInstanceInfo> showAnnos = getShowAnnotationsIncludeOuters();
     AnnotationInstanceInfo.makeLinkListHDF(
       data,
       base + ".showAnnotations",
-      showAnnotations().toArray(new AnnotationInstanceInfo[showAnnotations().size()]));
+      showAnnos.toArray(new AnnotationInstanceInfo[showAnnos.size()]));
 
     setFederatedReferences(data, base);
   }
@@ -1070,10 +1071,11 @@ public class ClassInfo extends DocInfo implements ContainerInfo, Comparable, Sco
       data.setValue("class.abstract", "abstract");
     }
 
+    ArrayList<AnnotationInstanceInfo> showAnnos = getShowAnnotationsIncludeOuters();
     AnnotationInstanceInfo.makeLinkListHDF(
       data,
       "class.showAnnotations",
-      showAnnotations().toArray(new AnnotationInstanceInfo[showAnnotations().size()]));
+      showAnnos.toArray(new AnnotationInstanceInfo[showAnnos.size()]));
 
     // class info
     String kind = kind();
@@ -1432,6 +1434,30 @@ public class ClassInfo extends DocInfo implements ContainerInfo, Comparable, Sco
 
   public ArrayList<AnnotationInstanceInfo> showAnnotations() {
     return mShowAnnotations;
+  }
+
+  public ArrayList<AnnotationInstanceInfo> getShowAnnotationsIncludeOuters() {
+    ArrayList<AnnotationInstanceInfo> allAnnotations = new ArrayList<AnnotationInstanceInfo>();
+    ClassInfo cl = this;
+    while (cl != null) {
+      if (cl.showAnnotations() != null) {
+        // Don't allow duplicates into the merged list
+        for (AnnotationInstanceInfo newAii : cl.showAnnotations()) {
+          boolean addIt = true;
+          for (AnnotationInstanceInfo existingAii : allAnnotations) {
+            if (existingAii.type().name() == newAii.type().name()) {
+              addIt = false;
+              break;
+            }
+          }
+          if (addIt) {
+            allAnnotations.add(newAii);
+          }
+        }
+      }
+      cl = cl.containingClass();
+    }
+    return allAnnotations;
   }
 
   private MethodInfo matchMethod(ArrayList<MethodInfo> methods, String name, String[] params,
