@@ -44,6 +44,23 @@ def:type_link_impl2(type, link, nav) ?><?cs
   /if ?><?cs
 /def ?>
 
+<?cs
+def:simple_type_link(type)?><?cs
+  if:type.link?><?cs
+    if:type.federated ?><a href="<?cs var:type.link ?>"><?csvar:type.label ?></a><?cs
+    else ?><a href="<?cs var:toroot ?><?cs var:type.link ?>"><?cs var:type.label ?></a><?cs
+    /if?><?cs
+  else ?><?cs var:type.label ?><?cs
+  /if?><?cs
+  if:subcount(type.typeArguments)?>&lt;<?cs
+    each:t=type.typeArguments?><?cs
+      call:type_link_impl(t, "true")?><?cs
+      if:!last(t) ?>,&nbsp;<?cs
+      /if ?><?cs
+    /each ?>&gt;<?cs
+  /if ?><?cs
+/def ?>
+
 <?cs def:class_name(type) ?><?cs call:type_link_impl(type, "false") ?><?cs /def ?>
 <?cs def:type_link2(type,nav) ?><?cs call:type_link_impl2(type, "true", nav) ?><?cs /def ?>
 <?cs def:type_link(type) ?><?cs call:type_link2(type, "false") ?><?cs /def ?>
@@ -59,7 +76,7 @@ def:cond_link(text, root, path, condition) ?><?cs
 <?cs # A comma separated parameter list ?><?cs 
 def:parameter_list(params) ?><?cs
   each:param = params ?><?cs
-      call:type_link(param.type)?> <?cs
+      call:simple_type_link(param.type)?> <?cs
       var:param.name ?><?cs
       if: name(param)!=subcount(params)-1?>, <?cs /if ?><?cs
   /each ?><?cs
