@@ -91,6 +91,7 @@ def:tag_list(tags) ?><?cs
         if:!tag.federatedSite ?><?cs
           var:toroot ?><?cs
         /if ?><?cs var:tag.href ?>"><?cs var:tag.label ?></a></code><?cs
+      elif:tag.kind == "@linkplain" ?><a href="<?cs var:tag.href ?>"><?cs var:tag.label ?></a><?cs
       elif:tag.kind == "@seeHref" ?><a href="<?cs var:tag.href ?>"><?cs var:tag.label ?></a><?cs
       elif:tag.kind == "@seeJustLabel" ?><?cs var:tag.label ?><?cs
       elif:tag.kind == "@value" ?><code><a href="<?cs
