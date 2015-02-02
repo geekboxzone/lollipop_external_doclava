@@ -47,7 +47,7 @@ def:type_link_impl2(type, link, nav) ?><?cs
 <?cs
 def:simple_type_link(type)?><?cs
   if:type.link?><?cs
-    if:type.federated ?><a href="<?cs var:type.link ?>"><?csvar:type.label ?></a><?cs
+    if:type.federated ?><a href="<?cs var:type.link ?>"><?cs var:type.label ?></a><?cs
     else ?><a href="<?cs var:toroot ?><?cs var:type.link ?>"><?cs var:type.label ?></a><?cs
     /if?><?cs
   else ?><?cs var:type.label ?><?cs
